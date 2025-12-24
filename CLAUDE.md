@@ -29,22 +29,32 @@ SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation
   - `analysis/README.md` - Analysis results
   - `pjm/README.md` - Project management
   - `material/README.md` - Design documents
+  - `work-records/README.md` - Shared session records
 
 ### 3. /tmp Usage Prohibited
 - **NEVER use the system `/tmp` directory**
-- Use `work/` for LLM agent working files (notes, intermediate data, drafts)
+- Use `work/` for personal user/LLM agent temporary work (not shared)
 
 ### 4. Git Operation Rules
 - **Commit after each work session** (git commit)
 - **Push only when user gives approval** (e.g., "GJ", "Good Job", or explicit push request)
 
 ### 5. Use Working Files Over Context Memory
-- **Actively create working files** in `work/` during task execution
+- **Actively create working files** during task execution
 - **DO NOT rely on ambiguous context memory** - persist important intermediate data, notes, and state to files
 - This ensures accuracy and prevents information loss across long conversations
-- **Note**: `temp/` is reserved for utility script output, use `work/` for LLM agent tasks
-- **Naming convention**: `work/session-YYYYMMDD-{task}.md`
-  - Example: `work/session-20260401-legacy-analysis.md`
+
+**Working directories**:
+| Directory | Git | Purpose |
+|-----------|-----|---------|
+| `work/` | Ignored | Personal temporary work (not shared) |
+| `work-records/` | Tracked | Shared session records |
+
+**Naming convention for shared records**:
+- `work-records/{user}/session-YYYYMMDD-{task}.md`
+- Example: `work-records/yukihisa/session-20260401-legacy-analysis.md`
+
+**Note**: `temp/` is reserved for utility script output only.
 
 ### 6. Internet Research for Missing Information
 - **When information is not available in the project directory, MUST collect factual information from the internet**
@@ -74,7 +84,8 @@ project-root/
 ├── database/            # Database files
 ├── analysis/            # Analysis results (legacy/business/data)
 ├── pjm/                 # Project management
-├── work/                # User/LLM agent working area
+├── work/                # Personal temp work (git ignored)
+├── work-records/        # Shared session records (git tracked)
 └── temp/                # Utility script temp output
 ```
 
@@ -262,7 +273,8 @@ src/
 | Design documents | `material/` |
 | Project management | `pjm/` |
 | Meeting materials | `pjm/meetings/` |
-| LLM agent working files | `work/` |
+| Personal temp work | `work/` (git ignored) |
+| Shared session records | `work-records/{user}/` |
 
 ### Important Distinctions
 
@@ -273,7 +285,8 @@ src/
 | `repository/` | **Legacy** analysis utility (SQLite + React) |
 | `repository/document-mds/` | Converted from `source/navs/documents/` (Excel→MD) |
 | `analysis/` | Analysis results (legacy/business/data) |
-| `work/` | User/LLM agent working area |
+| `work/` | Personal temp work (git ignored) |
+| `work-records/` | Shared session records (git tracked) |
 | `temp/` | Utility scripts temp output only |
 
 ### Data Flow (Legacy Analysis)

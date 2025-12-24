@@ -25,7 +25,8 @@
 | `pjm/` | プロジェクト管理 | [pjm/README.md](pjm/README.md) |
 | `material/` | 設計資料・仕様書 | [material/README.md](material/README.md) |
 | `database/` | データベースファイル | - |
-| `work/` | ユーザ/LLMエージェント作業領域 | - |
+| `work/` | 個人一時作業 (git対象外) | - |
+| `work-records/` | 共有セッション記録 | [work-records/README.md](work-records/README.md) |
 | `temp/` | ユーティリティスクリプト一時出力 | - |
 
 ## 外部ライブラリ (lib/)
