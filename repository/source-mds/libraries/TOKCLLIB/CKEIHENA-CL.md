@@ -1,0 +1,181 @@
+# CKEIHENA
+
+**種別**: JCL  
+**ライブラリ**: TOKCLLIB  
+**ソースファイル**: `source/navs/cobol/programs/TOKCLLIB/CKEIHENA.CL`
+
+## ソースコード
+
+```jcl
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    販売管理                             *  ./
+/. *   JOB-ID      :    CKEIHENA                             *  ./
+/. *   JOB-NAME    :    手書伝票入力（ＪＡＫ返品３０行伝票） *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'CKEIHENA'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '     /.部門名./
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '       /.担当者CD./
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR       ?LSTTIME  ,STRING*6,VALUE-'      '   /.時刻./
+    VAR       ?LSTDATE  ,STRING*8,VALUE-'        ' /.日付./
+    VAR       ?OPR1     ,STRING*50                 /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                 /.      2    ./
+    VAR       ?OPR3     ,STRING*50                 /.      3    ./
+    VAR       ?OPR4     ,STRING*50                 /.      4    ./
+    VAR       ?OPR5     ,STRING*50                 /.      5    ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIBO/TOKFLIB/TOKKLIB/TOKELIB/TOKDTLIB/TOKSOLIB
+             /TOKMDLIB
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##部門ｺｰﾄﾞ取得##./
+SKY1602B:
+
+    ?STEP :=   'SKY1602B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1602B.TOKELIBO,PARA-(?WS,?BUMON)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+
+/.##担当者CD指定##./
+SKY6101I:
+
+    ?STEP :=   'SKY6101I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-SKY6101I.TOKELIBO,PARA-(?BUMON,?TANCD)
+    IF        @PGMEC    ^=   0  THEN
+              IF  @PGMEC = 4010  THEN
+                  SNDMSG MSG-'##取消終了##',TO-XCTL
+                  RETURN
+              ELSE
+                  GOTO  ABEND
+              END
+    ELSE
+              ?MSGX :=  '##部門 = ' && ?BUMON && ' ##'
+              SNDMSG    ?MSGX,TO-XCTL
+              ?MSGX :=  '##担当 = ' && ?TANCD && ' ##'
+              SNDMSG    ?MSGX,TO-XCTL
+    END
+
+
+/.##手書伝票入力（島忠返品３０行伝票対応）##./
+SKEIHEN:
+
+    ?STEP :=   'SKEIHEN'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-SHOTBL4,TOFILE-SHOTBL4.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-ZAMZAIL1,TOFILE-ZAMZAIL1.TOKFLIB
+    OVRF      FILE-SHTDENL5,TOFILE-SHTDENL5.TOKFLIB
+    CALL      PGM-AKKEIHEN.TOKSOLIB,PARA-(?TANCD,?BUMON,
+                                          ?LSTTIME,?LSTDATE)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.##確認画面##./
+STEP010:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    ?OPR1  :=  '【自動出力確認画面】'
+    ?OPR2  :=  '手書伝票入力チェックリストを自動で出力するか'
+    ?OPR3  :=  'しないか選択して下さい。'
+    ?OPR4  :=  'ＰＦ９　　：自動出力を行なわない。'
+    ?OPR5  :=  'ＥＮＴＥＲ：自動出力を行なう。'
+    CALL      PAUSE.XUCL,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+/.##手書伝票チェックリスト##./
+SSY0102L:
+
+    ?STEP :=   'SSY0102L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##本社ﾚｰｻﾞｰへ出力##./
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+       OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+       OVRF      FILE-SHTDENLG,TOFILE-SHTDENLG.TOKFLIB
+       OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+       OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+       OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+       CALL      PGM-SSY0103L.TOKELIBO,PARA-(?BUMON,?TANCD,?LSTDATE,
+                                             ?LSTTIME,?LSTTIME)
+       IF        @PGMEC    ^=   0    THEN
+                 GOTO ABEND END
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+       OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+       OVRF      FILE-SHTDENLG,TOFILE-SHTDENLG.TOKFLIB
+       OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+       OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+       OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+       CALL      PGM-SSY0102L.TOKELIBO,PARA-(?BUMON,?TANCD,?LSTDATE,
+                                             ?LSTTIME,?LSTTIME)
+       IF        @PGMEC    ^=   0    THEN
+                 GOTO ABEND END
+    END
+
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+
+```

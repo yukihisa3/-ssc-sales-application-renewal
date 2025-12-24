@@ -1,0 +1,186 @@
+# PSY386S0
+
+**種別**: JCL  
+**ライブラリ**: TOKCLLIB  
+**ソースファイル**: `source/navs/cobol/programs/TOKCLLIB/PSY386S0.CL`
+
+## ソースコード
+
+```jcl
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    ナフコ出荷支援システム               *  ./
+/. *   JOB-ID      :    PSY386S0                             *  ./
+/. *   JOB-NAME    :    ナフコ商品マスタ保守　　　           *  ./
+/. *   UPDATE      :    2019/12/05 S2245053 　　　           *  ./
+/. *                      メンテ対象取引先コードをPARA制御   *  ./
+/. *   UPDATE      :    2021/03/01          　　　           *  ./
+/. *                      メンテリスト出力を追加　　　　　   *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSY386S0'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '     /.部門CD./
+    VAR       ?TANTO    ,STRING*8,VALUE-'        ' /.担当者CD./
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '       /.担当者CD./
+    VAR       ?TOKCD    ,STRING*8,VALUE-'00284202' /.対象取引先CD./
+    VAR       ?NYURYOKU ,STRING*8,VALUE-'99999999' /.入力日./
+    VAR       ?STIME    ,STRING*4,VALUE-'    '     /.時刻./
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR       ?P1       ,STRING*34                 /.ﾊﾟﾗﾒﾀ./
+    VAR       ?PGNM   ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1  ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2  ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3  ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4  ,STRING*40                  /.      5    ./
+    VAR       ?OPR1     ,STRING*50                 /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                 /.      2    ./
+    VAR       ?OPR3     ,STRING*50                 /.      3    ./
+    VAR       ?OPR4     ,STRING*50                 /.      4    ./
+    VAR       ?OPR5     ,STRING*50                 /.      5    ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  'ナフコ商品マスタ保守（資材用）'
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKELIBO/TOKDLIB/TOKFLIB/TOKKLIB/TOKMDLIB/
+              TOKDTLIB
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.##部門ｺｰﾄﾞ担当者ｺｰﾄﾞ取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANTO)
+    ?PGMEC    :=  @PGMEC
+    ?PGMEM    :=  @PGMEM
+    IF        ?PGMEC    ^=   0
+          THEN
+              ?KEKA4 := '部門ＣＤ担当者ＣＤ取得'
+              GOTO ABEND
+          ELSE
+          ?MSGX :=  '* 部門 = ' && ?BUMON && ' 担当 = ' && ?TANTO
+                    && ' *'
+          SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+    ?TANCD   :=  %SBSTR(?TANTO,1,2)
+
+/.##ﾅﾌｺ商品ﾏｽﾀﾒﾝﾃ##./
+SSY386SI:
+
+    ?STEP :=   'SSY386SI'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CALL      PGM-SSY386SI.TOKSOLIB,PARA-(?BUMON,?TANTO,?TOKCD,
+                                          ?NYURYOKU,?STIME)
+    ?PGMEC    :=  @PGMEC
+    ?PGMEM    :=  @PGMEM
+    IF        ?PGMEC    ^=   0  THEN
+              ?KEKA4 := 'ナフコ商品マスタ保守'
+              GOTO  ABEND
+    END
+
+    ?MSGX := '担当者 = ' && ?TANCD
+    SNDMSG ?MSGX,TO-XCTL
+    ?MSGX := '部門　 = ' && ?BUMON
+    SNDMSG ?MSGX,TO-XCTL
+    ?MSGX := '入力日 = ' && ?NYURYOKU
+    SNDMSG ?MSGX,TO-XCTL
+    ?MSGX := '時刻   = ' && ?STIME
+    SNDMSG ?MSGX,TO-XCTL
+    ?P1 := '1' && ?BUMON && ?TANCD && ?TANCD && ?NYURYOKU &&
+           ?NYURYOKU && ' ' && ?STIME && ?STIME
+    SNDMSG ?P1,TO-XCTL
+    /.##実行判定##./
+    IF  ?NYURYOKU = '99999999'  THEN
+         SNDMSG MSG-'##途中ｷｬﾝｾﾙ ##',TO-XCTL
+         SNDMSG MSG-'##自動出力ﾅｼ##',TO-XCTL
+    END
+
+/.##確認画面##./
+STEP010:
+
+    ?OPR1  :=  '【自動出力確認画面】'
+    ?OPR2  :=  '商品変換テーブルリストを自動で出力するか'
+    ?OPR3  :=  'しないか選択して下さい。'
+    ?OPR4  :=  'ＰＦ９　　：自動出力を行なわない。'
+    ?OPR5  :=  'ＥＮＴＥＲ：自動出力を行なう。'
+    CALL      PAUSE.XUCL,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+/.##商品変換テーブルリスト##./
+SLST060:
+
+    ?STEP :=   'SLST060 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##本社ﾚｰｻﾞｰへ出力##./
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+    OVRF     FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF     FILE-HSHOTBR2,TOFILE-HSHOTBR2.TOKKLIB
+    OVRF     FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF     FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF     FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    CALL     PGM-SLST065.TOKELIBO,PARA-(?P1)
+    ?PGMEC    :=  @PGMEC
+    ?PGMEM    :=  @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := 'メンテリスト'
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    ?KEKA1 :=  'ナフコ商品マスタ保守が異常しました。'
+    ?KEKA2 :=  'ログ採取し，ＮＡＶへ連絡して下さい。'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+
+    RETURN    PGMEC-@PGMEC
+
+```

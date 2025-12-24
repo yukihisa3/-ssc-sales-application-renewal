@@ -1,0 +1,237 @@
+# SSY57JDL
+
+**種別**: COBOL プログラム  
+**ライブラリ**: TOKSRLIB  
+**ソースファイル**: `source/navs/cobol/programs/TOKSRLIB/SSY57JDL.COB`
+
+## ソースコード
+
+```cobol
+****************************************************************
+*    顧客名　　　　　　　：　（株）サカタのタネ殿　　　　　　　*
+*    サブシステム　　　　：　グッデイオンライン　　　　　　　　*
+*    業務名　　　　　　　：　グッデイ受領データ　　　　　　　　*
+*    モジュール名　　　　：　受領データ削除　　　　　　　　　　*
+*    作成日／更新日　　　：　2020/01/08                        *
+*    作成者／更新者　　　：　NAV TAKAHASHI                     *
+*    処理概要　　　　　　：　指定日付以前のデータを削除する　  *
+*                            　　　　　　　　　　　　　　　　　*
+****************************************************************
+ IDENTIFICATION         DIVISION.
+*
+ PROGRAM-ID.            SSY57JDL.
+ AUTHOR.                NAV.
+ DATE-WRITTEN.          20/01/08.
+*
+ ENVIRONMENT            DIVISION.
+ CONFIGURATION          SECTION.
+ SOURCE-COMPUTER.       FUJITSU.
+ OBJECT-COMPUTER.       FUJITSU.
+ SPECIAL-NAMES.
+     CONSOLE  IS        CONS.
+ INPUT-OUTPUT           SECTION.
+ FILE-CONTROL.
+*ＤＣＭＪＡＰＡＮ出荷確定データ
+     SELECT   GDJYURF   ASSIGN    TO        DA-01-VI-GDJYURL1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      SEQUENTIAL
+                        RECORD    KEY       JYR-F01   JYR-F02
+                                            JYR-F03   JYR-F04
+                                            JYR-F05   JYR-F06
+                                            JYR-F07   JYR-F08
+                        FILE      STATUS    JYR-STATUS.
+*********
+ DATA                   DIVISION.
+ FILE                   SECTION.
+******************************************************************
+*    ＤＣＭＪＡＰＡＮ出荷確定データ
+******************************************************************
+ FD  GDJYURF            LABEL RECORD   IS   STANDARD.
+     COPY     GDJYURF   OF        XFDLIB
+              JOINING   JYR       PREFIX.
+*
+*****************************************************************
+*
+ WORKING-STORAGE        SECTION.
+*    ｶｳﾝﾄ
+ 01  END-FLG                 PIC  X(03)     VALUE  SPACE.
+ 01  WK-CNT.
+     03  READ-CNT            PIC  9(08)     VALUE  ZERO.
+     03  DEL-CNT             PIC  9(08)     VALUE  ZERO.
+ 01  WK-INV-FLG.
+     03  GDJYURF-INV-FLG     PIC  X(03)     VALUE  SPACE.
+     03  SHTDENF-INV-FLG     PIC  X(03)     VALUE  SPACE.
+ 01  WK-GYO-CNT              PIC  9(02)     VALUE  ZERO.
+ 01  WK-KMS-F06              PIC  9(09)     VALUE  ZERO.
+*
+ 01  WK-AREA.
+*システム日付の編集
+     03  SYS-DATE          PIC 9(06).
+     03  SYS-DATEW         PIC 9(08).
+ 01  WK-ST.
+     03  JYR-STATUS        PIC  X(02).
+*
+ 01  MSG-AREA.
+     03  MSG-START.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  ST-PG          PIC   X(08)  VALUE "SSY57JDL".
+         05  FILLER         PIC   X(11)  VALUE
+                                         " START *** ".
+     03  MSG-END.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  END-PG         PIC   X(08)  VALUE "SSY57JDL".
+         05  FILLER         PIC   X(11)  VALUE
+                                         " END   *** ".
+     03  MSG-ABEND.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  END-PG         PIC   X(08)  VALUE "SSY57JDL".
+         05  FILLER         PIC   X(11)  VALUE
+                                         " ABEND *** ".
+     03  ABEND-FILE.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  AB-FILE        PIC   X(08).
+         05  FILLER         PIC   X(06)  VALUE " ST = ".
+         05  AB-STS         PIC   X(02).
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+     03  SEC-NAME.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  FILLER         PIC   X(07)  VALUE " SEC = ".
+         05  S-NAME         PIC   X(30).
+     03  MSG-IN.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  FILLER         PIC   X(09)  VALUE " INPUT = ".
+         05  IN-CNT         PIC   9(06).
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+     03  MSG-OUT.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  FILLER         PIC   X(09)  VALUE " OUTPUT= ".
+         05  OUT-CNT        PIC   9(06).
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+*
+ 01  LINK-AREA.
+     03  LINK-IN-KBN        PIC   X(01).
+     03  LINK-IN-YMD6       PIC   9(06).
+     03  LINK-IN-YMD8       PIC   9(08).
+     03  LINK-OUT-RET       PIC   X(01).
+     03  LINK-OUT-YMD8      PIC   9(08).
+*
+ LINKAGE                SECTION.
+ 01  PARA-JDATE             PIC   9(08).
+*
+******************************************************************
+*             M A I N             M O D U L E                    *
+******************************************************************
+ PROCEDURE              DIVISION USING PARA-JDATE.
+ DECLARATIVES.
+*
+ FILEERR-SEC1           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   GDJYURF.
+     MOVE      "GDJYURF "   TO   AB-FILE.
+     MOVE      JYR-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ END     DECLARATIVES.
+*****************************************************************
+*                                                                *
+******************************************************************
+ GENERAL-PROCESS       SECTION.
+*
+     MOVE     "PROCESS-START"     TO   S-NAME.
+     PERFORM  INIT-SEC.
+     PERFORM  MAIN-SEC
+              UNTIL     END-FLG   =  "END".
+     PERFORM  END-SEC.
+*
+****************************************************************
+*　　　　　　　初期処理　　　　　　　　　　　　　　　　　　　　*
+****************************************************************
+ INIT-SEC               SECTION.
+     MOVE     "INIT-SEC"          TO   S-NAME.
+     OPEN     I-O       GDJYURF.
+     DISPLAY  MSG-START UPON CONS.
+*
+     MOVE     ZERO      TO        END-FLG   WK-CNT.
+     MOVE     SPACE     TO        WK-INV-FLG.
+*
+******************
+*システム日付編集*
+******************
+     ACCEPT      SYS-DATE  FROM      DATE.
+     MOVE       "3"        TO        LINK-IN-KBN.
+     MOVE        SYS-DATE  TO        LINK-IN-YMD6.
+     CALL       "SKYDTCKB"   USING   LINK-IN-KBN
+                                     LINK-IN-YMD6
+                                     LINK-IN-YMD8
+                                     LINK-OUT-RET
+                                     LINK-OUT-YMD8.
+     IF          LINK-OUT-RET   =    ZERO
+         MOVE    LINK-OUT-YMD8  TO   SYS-DATEW
+     ELSE
+         MOVE    ZERO           TO   SYS-DATEW
+     END-IF.
+*    ＤＣＭＪＡＰＡＮ出荷確定データ読込み
+     PERFORM GDJYURF-READ-SEC.
+*
+ INIT-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　メイン処理　　　　　　　　　　　　　　　　　　　*
+****************************************************************
+ GDJYURF-READ-SEC    SECTION.
+*
+     READ     GDJYURF
+              AT  END
+                  MOVE     "END"    TO  END-FLG
+                  GO                TO  GDJYURF-READ-EXIT
+              NOT AT END
+                  ADD       1       TO  READ-CNT
+     END-READ.
+*    バッチ番号のチェック
+     IF       PARA-JDATE  >  JYR-F01
+              CONTINUE
+     ELSE
+              MOVE     "END"        TO  END-FLG
+              GO                    TO  GDJYURF-READ-EXIT
+     END-IF.
+*
+ GDJYURF-READ-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　メイン処理　　　　　　　　　　　　　　　　　　　*
+****************************************************************
+ MAIN-SEC     SECTION.
+*
+     MOVE    "MAIN-SEC"           TO   S-NAME.
+*    ＤＣＭＪＡＰＡＮ出荷確定データ削除
+     DELETE   GDJYURF.
+     ADD      1                   TO   DEL-CNT.
+ MAIN010.
+*    ＤＣＭＪＡＰＡＮ出荷確定データ読込み
+     PERFORM GDJYURF-READ-SEC.
+*
+ MAIN-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　終了処理　　　　　　　　　　　　　　　　　　　　*
+****************************************************************
+ END-SEC       SECTION.
+*
+     MOVE     "END-SEC"  TO      S-NAME.
+*
+     DISPLAY "GDJYURF READ CNT = " READ-CNT  UPON CONS.
+     DISPLAY "GDJYURF DELE CNT = " DEL-CNT   UPON CONS.
+*
+     CLOSE     GDJYURF.
+*
+     STOP      RUN.
+*
+ END-EXIT.
+     EXIT.
+*-------------< PROGRAM END >------------------------------------*
+
+```

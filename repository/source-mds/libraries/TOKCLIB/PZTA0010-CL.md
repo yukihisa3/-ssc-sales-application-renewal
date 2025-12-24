@@ -1,0 +1,82 @@
+# PZTA0010
+
+**種別**: JCL  
+**ライブラリ**: TOKCLIB  
+**ソースファイル**: `source/navs/cobol/programs/TOKCLIB/PZTA0010.CL`
+
+## ソースコード
+
+```jcl
+/. ***********************************************************  ./
+/. *     サカタのタネ　在庫システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    _卸　　　　　　　　　　　           *  ./
+/. *   JOB-ID      :    PZTA0010                             *  ./
+/. *   JOB-NAME    :    _卸ファイル作成　                   *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PZTA0010'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?OPR1     ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                  /.      2    ./
+    VAR       ?OPR3     ,STRING*50                  /.      3    ./
+    VAR       ?OPR4     ,STRING*50                  /.      4    ./
+    VAR       ?OPR5     ,STRING*50                  /.      5    ./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+
+/.  _卸ファイル作成                                            ./
+ZTA0010B:
+
+    ?OPR1  :=  '　＃＃＃＃＃＃＃＃＃　_卸処理　＃＃＃＃＃＃＃＃　'
+    ?OPR2  :=  '　_卸ファイルの作成を行います。　　　　　　　　　'
+    ?OPR3  :=  '　宜しいですか？　　　　　　　　　　　　　　　　　'
+    ?OPR4  :=  '　＜処理続行＝入力／実行　ＰＦ９＝処理中止＞　　　'
+    ?OPR5  :=  '　＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    ?STEP :=   'ZTA0010B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-ZZAIMS4,TOFILE-ZZAIMS4.TOKFLIB
+    OVRF      FILE-ZTANADT,TOFILE-ZTANADT.TOKFLIB
+    CALL      PGM-ZTA0010B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+
+```

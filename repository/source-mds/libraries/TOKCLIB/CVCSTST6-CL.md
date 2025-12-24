@@ -1,0 +1,30 @@
+# CVCSTST6
+
+**種別**: JCL  
+**ライブラリ**: TOKCLIB  
+**ソースファイル**: `source/navs/cobol/programs/TOKCLIB/CVCSTST6.CL`
+
+## ソースコード
+
+```jcl
+    PGM
+    VAR ?KBN      ,STRING*1,VALUE-'2'
+    VAR ?HIDUKE   ,STRING*8,VALUE-'19991001'
+    VAR ?JIKAN    ,STRING*4,VALUE-'0631'
+    VAR ?TOKCD    ,STRING*8,VALUE-'00000173'
+    VAR ?DTKEN    ,STRING*5,VALUE-'     '
+    VAR ?DPKEN    ,STRING*5,VALUE-'     '
+    VAR ?JFLG     ,STRING*1,VALUE-' '
+    VAR ?KFLG     ,STRING*2,VALUE-'  '
+    ACTMSGQ MAXRMSG-50
+    DEFLIBL TOKELIB/TOKFLIB
+CVCSTST6:
+    OVRF      FILE-JHMTJSF,TOFILE-JHMTJSL1.TOKFLIB
+    CALL      PGM-SCV0060B.TOKELIB,
+        PARA-(?KBN,?HIDUKE,?JIKAN,?TOKCD,?DTKEN,?DPKEN,?JFLG,?KFLG)
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG '## ABEND ##',TO-XCTL.@ORGPROF
+    END
+    RETURN    PGMEC-@PGMEC
+
+```

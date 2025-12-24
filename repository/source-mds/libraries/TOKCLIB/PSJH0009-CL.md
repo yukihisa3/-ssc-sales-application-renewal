@@ -1,0 +1,68 @@
+# PSJH0009
+
+**種別**: JCL  
+**ライブラリ**: TOKCLIB  
+**ソースファイル**: `source/navs/cobol/programs/TOKCLIB/PSJH0009.CL`
+
+## ソースコード
+
+```jcl
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    受配信サブシステム       　　　     *  ./
+/. *   JOB-ID      :    PSJH0009                             *  ./
+/. *   JOB-NAME    :    回線環境マスタリスト   　　　　　　  *  ./
+/. *               :    ＜全社分出力＞                       *  ./
+/. ***********************************************************  ./
+/.###ﾜｰｸｴﾘｱ定義####./
+    PGM
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PSJH0009'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+/.###ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.  仕入伝票発行（ＴＡ_　　_型）                              ./
+PSY21010:
+    /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    /.ｶﾀｸﾗﾌｧｲﾙ定義./
+    OVRF      FILE-JHMKAIF,TOFILE-JHMKAIL1.TOKFLIB
+    /.ﾌﾟﾛｸﾞﾗﾑｺｰﾙ./
+    CALL      PGM-SJH0009L.TOKELIB
+    /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰ判定./
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+
+```

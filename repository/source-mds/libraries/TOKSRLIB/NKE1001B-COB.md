@@ -1,0 +1,929 @@
+# NKE1001B
+
+**種別**: COBOL プログラム  
+**ライブラリ**: TOKSRLIB  
+**ソースファイル**: `source/navs/cobol/programs/TOKSRLIB/NKE1001B.COB`
+
+## ソースコード
+
+```cobol
+****************************************************************
+*
+*    顧客名　　　　　　　：　（株）サカタのタネ殿　　　　　　　
+*    業務名　　　　　　　：　出荷
+*    サブシステム　　　　：　出荷検品サブシステム
+*    モジュール名　　　　：　振分倉庫一括変更
+*    作成日／更新日　　　：　2019/06/21
+*    作成者／更新者　　　：　NAV
+*    処理概要　　　　　　：　発注ＭＳＧ、売上伝票ファイルの　
+*                            振分倉庫を一括変更する。
+*                            変更条件は画面指定。
+*    更新履歴            ：
+*
+*　
+****************************************************************
+****************************************************************
+ IDENTIFICATION         DIVISION.
+****************************************************************
+ PROGRAM-ID.            NKE1001B.
+ AUTHOR.                NAV.
+ DATE-WRITTEN.          2019/06/21.
+ DATE-COMPILED.
+ SECURITY.              NONE.
+****************************************************************
+ ENVIRONMENT            DIVISION.
+****************************************************************
+ CONFIGURATION          SECTION.
+ SOURCE-COMPUTER.       FUJITSU.
+ OBJECT-COMPUTER.       FUJITSU.
+ SPECIAL-NAMES.
+         STATION   IS   STAT
+         CONSOLE   IS   CONS.
+*
+ INPUT-OUTPUT           SECTION.
+ FILE-CONTROL.
+*----<< 表示ファイル >>--*
+     SELECT   DSPFILE   ASSIGN         01-GS-DSPF
+                        FORMAT         DSP-FMT
+                        GROUP          DSP-GRP
+                        PROCESSING     DSP-PRO
+                        UNIT CONTROL   DSP-CON
+                        FUNCTION       DSP-FNC
+                        STATUS         DSP-ST.
+*----<< 伝票データ >>--*
+     SELECT   SHTDENF   ASSIGN         DA-01-VI-SHTDENLA
+                        ORGANIZATION   INDEXED
+                        ACCESS    MODE DYNAMIC
+                        RECORD    KEY  DEN-F46   DEN-F47
+                                       DEN-F01   DEN-F48
+                                       DEN-F02   DEN-F04
+                                       DEN-F051  DEN-F07
+                                       DEN-F112  DEN-F03
+                                       WITH DUPLICATES
+                        STATUS         SHTDENF-ST.
+*----<< 流通ＢＭＳ発注メッセージ >>--*
+     SELECT   BMSHACF   ASSIGN         DA-01-VI-BMSHACL3
+                        ORGANIZATION   INDEXED
+                        ACCESS    MODE DYNAMIC
+                        RECORD    KEY  HAC-F011
+                                       HAC-F012
+                                       HAC-F013
+                                       HAC-F02
+                                       HAC-F346
+                                       HAC-F308
+                                       HAC-F302
+                                       HAC-F402
+                                       WITH DUPLICATES
+                        STATUS         BMSHACF-ST.
+*----<< 取引先マスタ >>--*
+     SELECT   HTOKMS    ASSIGN         DA-01-VI-TOKMS2
+                        ORGANIZATION   INDEXED
+                        ACCESS    MODE RANDOM
+                        RECORD    KEY  TOK-F01
+                        STATUS         HTOKMS-ST.
+*----<< 倉庫マスタ >>--*
+     SELECT   ZSOKMS1   ASSIGN         DA-01-VI-ZSOKMS1
+                        ORGANIZATION   INDEXED
+                        ACCESS    MODE RANDOM
+                        RECORD    KEY  SOK-F01
+                        STATUS         ZSOKMS1-ST.
+*
+****************************************************************
+ DATA                   DIVISION.
+****************************************************************
+ FILE                   SECTION.
+*----<< 表示ファイル >>--*
+ FD  DSPFILE            LABEL     RECORD   IS   STANDARD.
+     COPY     FKE10011  OF        XMDLIB.
+*----<< 伝票データ >>--*
+ FD  SHTDENF            LABEL     RECORD   IS   STANDARD.
+     COPY     SHTDENF   OF        XFDLIB
+              JOINING   DEN       PREFIX.
+*----<< 流通ＢＭＳ発注メッセージ >>--*
+ FD  BMSHACF            LABEL     RECORD   IS   STANDARD.
+     COPY     BMSHACF   OF        XFDLIB
+              JOINING   HAC       PREFIX.
+*----<< 取引先マスタ >>--*
+ FD  HTOKMS             LABEL RECORD   IS   STANDARD.
+     COPY     HTOKMS    OF        XFDLIB
+              JOINING   TOK       PREFIX.
+*----<< 倉庫マスタ >>--*
+ FD  ZSOKMS1            LABEL RECORD   IS   STANDARD.
+     COPY     ZSOKMS1   OF        XFDLIB
+              JOINING   SOK       PREFIX.
+*--------------------------------------------------------------*
+ WORKING-STORAGE        SECTION.
+*--------------------------------------------------------------*
+ 01  FLAGS.
+     03  ERR-FLG        PIC  9(02)    VALUE  ZERO.
+     03  END-FLG-DEN    PIC  X(03)    VALUE  SPACE.
+     03  END-FLG-HAC    PIC  X(03)    VALUE  SPACE.
+*
+*----<< ﾌｱｲﾙ ｽﾃｰﾀｽ >>--*
+ 01  SHTDENF-ST        PIC  X(02).
+ 01  BMSHACF-ST        PIC  X(02).
+ 01  HTOKMS-ST         PIC  X(02).
+ 01  ZSOKMS1-ST        PIC  X(02).
+*
+*----<< カウンタ >>--*
+ 01  RD-CNT-DEN         PIC  9(07)    VALUE  ZERO.
+ 01  RD-CNT-HAC         PIC  9(07)    VALUE  ZERO.
+ 01  RW-CNT-DEN         PIC  9(07)    VALUE  ZERO.
+ 01  RW-CNT-HAC         PIC  9(07)    VALUE  ZERO.
+*----<< ﾋﾂﾞｹ ﾜｰｸ >>--*
+ 01  SYS-DATE           PIC  9(06).
+ 01  FILLER             REDEFINES      SYS-DATE.
+     03  SYS-YY         PIC  9(02).
+     03  SYS-MM         PIC  9(02).
+     03  SYS-DD         PIC  9(02).
+ 01  SYS-DATEW          PIC  9(08).
+ 01  FILLER             REDEFINES      SYS-DATEW.
+     03  SYS-YYW        PIC  9(04).
+     03  SYS-MMW        PIC  9(02).
+     03  SYS-DDW        PIC  9(02).
+ 01  WK-SYSYMD.
+     03  WK-SYSYY       PIC  9(04).
+     03  FILLER         PIC  X(01)     VALUE "/".
+     03  WK-SYSMM       PIC  Z9.
+     03  FILLER         PIC  X(01)     VALUE "/".
+     03  WK-SYSDD       PIC  Z9.
+ 01  SYS-TIME           PIC  9(08).
+ 01  FILLER             REDEFINES      SYS-TIME.
+     03  SYS-HH         PIC  9(02).
+     03  SYS-MN         PIC  9(02).
+     03  SYS-SS         PIC  9(02).
+     03  SYS-MS         PIC  9(02).
+ 01  SYS-TIME2          PIC  9(08).
+ 01  FILLER             REDEFINES      SYS-TIME2.
+     03  SYS-TIMEW      PIC  9(06).
+     03  FILLER         PIC  9(02).
+*
+ 01  WK-SOKCD           PIC  X(02)  VALUE  SPACE.
+ 01  WK-SOKCD2          PIC  X(02)  VALUE  SPACE.
+*----<< ﾃﾞｨｽﾌﾟﾚｲ ｺﾝﾄﾛｰﾙ ｴﾘｱ >>-*
+ 01  GR-NO              PIC  9(02).
+ 01  WK-GRP             PIC  X(08).
+ 01  DSP-CNTL.
+     03  DSP-ST         PIC  X(02).
+     03  DSP-ST2        PIC  X(04).
+     03  DSP-FMT        PIC  X(08).
+     03  DSP-GRP        PIC  X(08).
+     03  DSP-PRO        PIC  X(02).
+     03  DSP-FNC        PIC  X(04).
+     03  DSP-CON        PIC  X(06).
+*
+*----<< ﾌｱﾝｸｼﾖﾝ ｷｰ ﾃ-ﾌﾞﾙ >>-*
+ 01  FNC-TABLE.
+     03  ENT            PIC  X(04)     VALUE     "E000".
+     03  PF04           PIC  X(04)     VALUE     "F004".
+     03  PF05           PIC  X(04)     VALUE     "F005".
+     03  PF06           PIC  X(04)     VALUE     "F006".
+*
+*----<< ﾌｱﾝｸｼﾖﾝ ｷｰ ｶﾞｲﾄﾞ >>-*
+ 01  GUIDE01       PIC  N(40)  VALUE   NC"_取　消　_終　了".
+ 01  GUIDE02       PIC  N(40)  VALUE
+         NC"_取　消　_終　了　_項目戻り".
+*
+ 01  MSG-AREA.
+     03  MSG01               PIC  N(20)  VALUE
+              NC"ＰＦキーが違います".
+     03  MSG02               PIC  N(20)  VALUE
+              NC"バッチＮｏを入力して下さい。".
+     03  MSG03               PIC  N(20)  VALUE
+              NC"バッチＮｏに誤りがあります。".
+     03  MSG04               PIC  N(20)  VALUE
+              NC"取引先コードが違います。".
+     03  MSG05               PIC  N(20)  VALUE
+              NC"売上伝票データに存在しません。".
+     03  MSG06               PIC  N(20)  VALUE
+              NC"倉庫が違います。".
+     03  MSG07               PIC  N(20)  VALUE
+              NC"日付に誤りがあります。".
+     03  MSG08               PIC  N(20)  VALUE
+              NC"　　　　　　　　　　　　　　　".
+
+ 01  FILLER                  REDEFINES   MSG-AREA.
+     03  MSG-TBL             PIC  N(20)  OCCURS       8.
+*
+ 01  SEC-AREA.
+     03  SEC-NAME.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  FILLER         PIC   X(07)  VALUE " SEC = ".
+         05  S-NAME         PIC   X(30).
+*
+ 01  LINK-AREA.
+     03  LINK-IN-KBN        PIC   X(01).
+     03  LINK-IN-YMD6       PIC   9(06).
+     03  LINK-IN-YMD8       PIC   9(08).
+     03  LINK-OUT-RET       PIC   X(01).
+     03  LINK-OUT-YMD8      PIC   9(08).
+*
+ LINKAGE                SECTION.
+*01  PARA-JDATE             PIC   9(08).
+*01  PARA-JTIME             PIC   9(04).
+*01  PARA-TORICD            PIC   9(08).
+ 01  PARA-SOKO              PIC   X(02).
+ 01  PARA-DSOKO             PIC   X(02).
+*01  PARA-NOHBI             PIC   9(08).
+*01  PARA-OUTKBN            PIC   9(01).
+*01  PARA-KUBUN             PIC   X(01).
+*
+****************************************************************
+ PROCEDURE  DIVISION             USING
+*                                      PARA-JDATE
+*                                      PARA-JTIME
+*                                      PARA-TORICD
+                                       PARA-SOKO
+                                       PARA-DSOKO.
+*                                      PARA-NOHBI
+*                                      PARA-OUTKBN
+*                                      PARA-KUBUN.
+****************************************************************
+*--------------------------------------------------------------*
+*    LEVEL 0        エラー処理　　　　　　　　　　　　　　　　 *
+*--------------------------------------------------------------*
+ DECLARATIVES.
+*----<< 表示ファイル >>--*
+ DSPFILE-ERR            SECTION.
+     USE AFTER     EXCEPTION PROCEDURE      DSPFILE.
+     ACCEPT   SYS-DATE       FROM DATE.
+     ACCEPT   SYS-TIME       FROM TIME.
+     DISPLAY  "### NKE1001B DSPFILE ERROR " DSP-CNTL " "
+              SYS-YY "." SYS-MM "." SYS-DD " "
+              SYS-HH ":" SYS-MN ":" SYS-SS " ###"
+                                       UPON CONS.
+     DISPLAY  SEC-NAME                 UPON CONS.
+     MOVE     "4000"   TO        PROGRAM-STATUS.
+     CLOSE    SHTDENF   BMSHACF HTOKMS    ZSOKMS1    DSPFILE.
+     STOP     RUN.
+*----<< 伝票データ >>--*
+ SHTDENF-ERR            SECTION.
+     USE AFTER     EXCEPTION PROCEDURE      SHTDENF.
+     ACCEPT   SYS-DATE       FROM DATE.
+     ACCEPT   SYS-TIME       FROM TIME.
+     DISPLAY  "### NKE1001B SHTDENF ERROR " SHTDENF-ST " "
+              SYS-YY "." SYS-MM "." SYS-DD " "
+              SYS-HH ":" SYS-MN ":" SYS-SS " ###"
+                                       UPON CONS.
+     DISPLAY  SEC-NAME                 UPON CONS.
+     MOVE     "4000"   TO        PROGRAM-STATUS.
+     CLOSE    SHTDENF   BMSHACF HTOKMS    ZSOKMS1    DSPFILE.
+     STOP     RUN.
+*----<< ＢＭＳ発注ＭＳＧ >>--*
+ BMSHACF-ERR            SECTION.
+     USE AFTER     EXCEPTION PROCEDURE      BMSHACF.
+     ACCEPT   SYS-DATE       FROM DATE.
+     ACCEPT   SYS-TIME       FROM TIME.
+     DISPLAY  "### NKE1001B BMSHACF ERROR " BMSHACF-ST " "
+              SYS-YY "." SYS-MM "." SYS-DD " "
+              SYS-HH ":" SYS-MN ":" SYS-SS " ###"
+                                       UPON CONS.
+     DISPLAY  SEC-NAME                 UPON CONS.
+     CLOSE    SHTDENF   BMSHACF HTOKMS    ZSOKMS1    DSPFILE.
+     MOVE     "4000"   TO        PROGRAM-STATUS.
+     STOP     RUN.
+*----<< 取引先マスタ >>--*
+ HTOKMS-ERR             SECTION.
+     USE AFTER     EXCEPTION PROCEDURE      HTOKMS.
+     ACCEPT   SYS-DATE       FROM DATE.
+     ACCEPT   SYS-TIME       FROM TIME.
+     DISPLAY  "### NKE1001B HTOKMS ERROR " HTOKMS-ST " "
+              SYS-YY "." SYS-MM "." SYS-DD " "
+              SYS-HH ":" SYS-MN ":" SYS-SS " ###"
+                                       UPON CONS.
+     DISPLAY  SEC-NAME                 UPON CONS.
+     MOVE     "4000"   TO        PROGRAM-STATUS.
+     CLOSE    SHTDENF   BMSHACF HTOKMS    ZSOKMS1    DSPFILE.
+     STOP     RUN.
+*----<< 倉庫マスタ >>--*
+ ZSOKMS1-ERR             SECTION.
+     USE AFTER     EXCEPTION PROCEDURE      ZSOKMS1.
+     ACCEPT   SYS-DATE       FROM DATE.
+     ACCEPT   SYS-TIME       FROM TIME.
+     DISPLAY  "### NKE1001B ZSOKMS1 ERROR " ZSOKMS1-ST " "
+              SYS-YY "." SYS-MM "." SYS-DD " "
+              SYS-HH ":" SYS-MN ":" SYS-SS " ###"
+                                       UPON CONS.
+     DISPLAY  SEC-NAME                 UPON CONS.
+     MOVE     "4000"   TO        PROGRAM-STATUS.
+     CLOSE    SHTDENF   BMSHACF HTOKMS    ZSOKMS1    DSPFILE.
+     STOP     RUN.
+ END DECLARATIVES.
+*--------------------------------------------------------------*
+*    LEVEL   1     ﾌﾟﾛｸﾞﾗﾑ ｺﾝﾄﾛｰﾙ                              *
+*--------------------------------------------------------------*
+ 000-PROG-CNTL          SECTION.
+     MOVE    "000-PROG-CNTL"      TO   S-NAME.
+     PERFORM  100-INIT-RTN.
+     PERFORM  200-MAIN-RTN   UNTIL     GR-NO    =    99.
+     PERFORM  300-END-RTN.
+     STOP RUN.
+ 000-PROG-CNTL-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  2      ｼｮｷ ｼｮﾘ                                     *
+*--------------------------------------------------------------*
+ 100-INIT-RTN           SECTION.
+     MOVE    "100-INIT-RTN"       TO   S-NAME.
+     ACCEPT   SYS-DATE       FROM DATE.
+     MOVE    "3"        TO        LINK-IN-KBN.
+     MOVE     SYS-DATE  TO        LINK-IN-YMD6.
+     CALL    "SKYDTCKB" USING     LINK-IN-KBN
+                                  LINK-IN-YMD6
+                                  LINK-IN-YMD8
+                                  LINK-OUT-RET
+                                  LINK-OUT-YMD8.
+     IF       LINK-OUT-RET   =    ZERO
+         MOVE LINK-OUT-YMD8  TO   SYS-DATEW
+     ELSE
+         MOVE ZERO           TO   SYS-DATEW
+     END-IF.
+*
+     MOVE     SYS-YYW        TO   WK-SYSYY.
+     MOVE     SYS-MMW        TO   WK-SYSMM.
+     MOVE     SYS-DDW        TO   WK-SYSDD.
+*
+     ACCEPT   SYS-TIME       FROM TIME.
+     DISPLAY  "*** NKE1001B START *** "
+              SYS-YY "." SYS-MM "." SYS-DD " "
+              SYS-HH ":" SYS-MN ":" SYS-SS
+                                       UPON CONS.
+     OPEN     I-O       DSPFILE.
+     OPEN     I-O       SHTDENF.
+     OPEN     I-O       BMSHACF.
+     OPEN     INPUT     HTOKMS.
+     OPEN     INPUT     ZSOKMS1.
+*----<< ﾜｰｸ ｼｮｷｾｯﾄ >>-*
+     MOVE     0              TO   GR-NO.
+ 100-INIT-RTN-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  2      ﾒｲﾝ ｼｮﾘ                                     *
+*--------------------------------------------------------------*
+ 200-MAIN-RTN           SECTION.
+     MOVE    "200-MAIN-RTN"       TO   S-NAME.
+*----<< ﾊﾝｲ ｼﾃｲ ｶﾞﾒﾝ ｸﾘｱ >>-*
+     PERFORM  210-DSP-INIT   UNTIL     GR-NO    NOT  =    0.
+*----<< ｼﾞｮｳｹﾝ ﾆｭｳﾘｮｸ >>-*
+     PERFORM  220-INP-GRP01  UNTIL     GR-NO    NOT  =    1.
+*----<< ｶｸﾆﾝ ﾆｭｳﾘｮｸ >>-*
+     PERFORM  230-INP-KKNN   UNTIL     GR-NO    NOT  =    9.
+*----<< ﾌﾘﾜｹｿｳｺ　ﾍﾝｺｳｼｮﾘ >>-*
+*
+     DISPLAY   NC"指定バッチ＝" JDATE "-" JTIME "-" TORICD
+               UPON CONS.
+     DISPLAY   NC"指定納品日＝" NOHBI
+               UPON CONS.
+     DISPLAY   NC"変更前倉庫＝" SOKO
+               UPON CONS.
+     DISPLAY   NC"変更後倉庫＝" SOKO2
+               UPON CONS.
+     PERFORM  240-UPDT-SEC   UNTIL     GR-NO    NOT  =    10.
+ 200-MAIN-RTN-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  2      ｴﾝﾄﾞ ｼｮﾘ                                    *
+*--------------------------------------------------------------*
+ 300-END-RTN            SECTION.
+     MOVE    "300-END-RTN"        TO   S-NAME.
+     CLOSE    DSPFILE.
+     CLOSE    SHTDENF.
+     CLOSE    BMSHACF.
+     CLOSE    HTOKMS.
+     CLOSE    ZSOKMS1.
+*
+     DISPLAY  NC"売上伝票　読込＝" RD-CNT-DEN UPON CONS.
+     DISPLAY  NC"売上伝票　更新＝" RW-CNT-DEN UPON CONS.
+     DISPLAY  NC"発注ＭＳＧ読込＝" RD-CNT-HAC UPON CONS.
+     DISPLAY  NC"発注ＭＳＧ更新＝" RW-CNT-HAC UPON CONS.
+     ACCEPT   SYS-DATE       FROM DATE.
+     ACCEPT   SYS-TIME       FROM TIME.
+     DISPLAY  "*** NKE1001B END *** "
+              SYS-YY "." SYS-MM "." SYS-DD " "
+              SYS-HH ":" SYS-MN ":" SYS-SS
+                                       UPON CONS.
+ 300-END-RTN-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      ﾃﾞｨｽﾌﾟﾚｰ  ｼｮｷ ﾋｮｳｼﾞ                         *
+*--------------------------------------------------------------*
+ 210-DSP-INIT           SECTION.
+     MOVE    "210-DSP-INIT"       TO   S-NAME.
+     MOVE     SPACE          TO   FKE10011.
+*
+     PERFORM  CLR-HEAD-RTN.
+     PERFORM  CLR-TAIL-RTN.
+*
+     MOVE    "NKE1001B"      TO   PGID.
+     MOVE    "FKE10011"      TO   FORM.
+*倉庫コードパラメタより倉庫コード入力チェック
+     IF       PARA-DSOKO  =  "01"
+              MOVE    " "    TO   EDIT-STATUS OF SOKO
+     ELSE
+              MOVE      PARA-SOKO TO   SOK-F01 SOKO
+              READ      ZSOKMS1
+                  INVALID  KEY
+                        MOVE      ALL NC"＊" TO   SOKONM
+              NOT INVALID  KEY
+                        MOVE      SOK-F02    TO   SOKONM
+              END-READ
+              MOVE    "X"    TO   EDIT-STATUS OF SOKO
+     END-IF.
+*
+     MOVE     SPACE          TO   DSP-CNTL.
+     MOVE     "FKE10011"     TO   DSP-FMT.
+     MOVE     "SCREEN"       TO   DSP-GRP.
+     PERFORM  900-DSP-WRITE.
+*
+     MOVE     1              TO   GR-NO.
+ 210-DSP-INIT-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      ﾊﾞｯﾁNO.  ﾆｭｳﾘｮｸ                             *
+*--------------------------------------------------------------*
+ 220-INP-GRP01          SECTION.
+     MOVE     "220-INP-GRP01"     TO   S-NAME.
+     MOVE     "GRP01"        TO   WK-GRP.
+     PERFORM  900-DSP-READ.
+*
+     EVALUATE DSP-FNC
+         WHEN PF04
+              MOVE      0         TO   GR-NO
+         WHEN PF05
+              MOVE      99        TO   GR-NO
+              MOVE      4010      TO   PROGRAM-STATUS
+         WHEN ENT
+              PERFORM   CLR-HEAD-RTN
+              PERFORM   220-GRP01-CHECK-SEC
+              IF        ERR-FLG   =    ZERO
+                        MOVE      9    TO   GR-NO
+              END-IF
+         WHEN OTHER
+              MOVE      1         TO   ERR-FLG
+     END-EVALUATE.
+*
+ 220-INP-GRP01-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      ﾊﾞｯﾁNO. ﾁｪｯｸ                                *
+*--------------------------------------------------------------*
+ 220-GRP01-CHECK-SEC    SECTION.
+     MOVE     "220-CRP01-CHECK-SEC"    TO   S-NAME.
+     MOVE     ZERO      TO        ERR-FLG.
+*
+     IF     ( JDATE     =    ZERO ) AND
+            ( JTIME     =    ZERO ) AND
+            ( TORICD    =    ZERO )
+              MOVE      2         TO   ERR-FLG
+              MOVE     "C"        TO   EDIT-CURSOR OF JDATE
+              MOVE     "R"        TO   EDIT-OPTION OF JDATE
+              MOVE     "R"        TO   EDIT-OPTION OF JTIME
+              MOVE     "R"        TO   EDIT-OPTION OF TORICD
+              GO   TO   220-GRP01-CHECK-EXIT
+     END-IF.
+*
+*    IF  KUBUN = SPACE OR "1"
+*        CONTINUE
+*    ELSE
+*        IF   ERR-FLG   =    ZERO
+*             MOVE      8    TO   ERR-FLG
+*        END-IF
+*        MOVE     "C"   TO   EDIT-CURSOR OF KUBUN
+*        MOVE     "R"   TO   EDIT-OPTION OF KUBUN
+*        GO   TO   220-GRP01-CHECK-EXIT
+*    END-IF.
+*    受信日付チェック
+     IF  JDATE     NOT =     ZERO
+         MOVE     "2"        TO        LINK-IN-KBN
+         MOVE      JDATE     TO        LINK-IN-YMD8
+         CALL     "SKYDTCKB" USING     LINK-IN-KBN
+                                       LINK-IN-YMD6
+                                       LINK-IN-YMD8
+                                       LINK-OUT-RET
+                                       LINK-OUT-YMD8
+         IF   LINK-OUT-RET   NOT =     ZERO
+              IF        ERR-FLG   =    ZERO
+                        MOVE      3    TO   ERR-FLG
+              END-IF
+              MOVE     "C"        TO   EDIT-CURSOR OF JDATE
+              MOVE     "R"        TO   EDIT-OPTION OF JDATE
+              GO   TO   220-GRP01-CHECK-EXIT
+         END-IF
+     END-IF.
+*    受信時間
+     IF  JTIME     NOT NUMERIC
+         MOVE      ZERO      TO   JTIME
+     END-IF.
+*    取引先チェック
+     IF  TORICD    NOT =     ZERO
+         MOVE      SPACE     TO   TOK-REC
+         INITIALIZE               TOK-REC
+         MOVE      TORICD    TO   TOK-F01
+         READ      HTOKMS
+             INVALID
+                   MOVE      SPACE     TO   TORINM
+                   IF   ERR-FLG   =    ZERO
+                        MOVE      4    TO   ERR-FLG
+                   END-IF
+                   MOVE     "C"   TO   EDIT-CURSOR OF TORICD
+                   MOVE     "R"   TO   EDIT-OPTION OF TORICD
+             NOT INVALID
+                   MOVE      TOK-F02   TO   TORINM
+         END-READ
+     END-IF.
+*    納品日チェック
+     IF  NOHBI         =     SPACE
+         MOVE      ZERO      TO        NOHBI
+     END-IF.
+     IF  NOHBI     NOT =     ZERO
+         MOVE     "2"        TO        LINK-IN-KBN
+         MOVE      NOHBI     TO        LINK-IN-YMD8
+         CALL     "SKYDTCKB" USING     LINK-IN-KBN
+                                       LINK-IN-YMD6
+                                       LINK-IN-YMD8
+                                       LINK-OUT-RET
+                                       LINK-OUT-YMD8
+         IF   LINK-OUT-RET   NOT =     ZERO
+              IF        ERR-FLG   =    ZERO
+                        MOVE      7    TO   ERR-FLG
+              END-IF
+              MOVE     "C"        TO   EDIT-CURSOR OF NOHBI
+              MOVE     "R"        TO   EDIT-OPTION OF NOHBI
+              GO   TO   220-GRP01-CHECK-EXIT
+         END-IF
+     END-IF.
+*    振り分け倉庫コード(変更前)チェック
+     IF     ( SOKO      NOT =     SPACE )
+     AND    ( SOKO      NOT =     "00"  )
+              MOVE      SOKO      TO   SOK-F01
+              READ      ZSOKMS1
+                  INVALID  KEY
+                        MOVE      SPACE     TO   SOKONM
+                        IF   ERR-FLG   =    ZERO
+                             MOVE      6    TO   ERR-FLG
+                        END-IF
+                        MOVE     "C"   TO   EDIT-CURSOR OF SOKO
+                        MOVE     "R"   TO   EDIT-OPTION OF SOKO
+              NOT INVALID  KEY
+                        MOVE      SOK-F02   TO   SOKONM
+                        MOVE      SOKO      TO   WK-SOKCD
+              END-READ
+     ELSE
+              MOVE      SPACE          TO   WK-SOKCD
+              MOVE      NC"全倉庫"     TO   SOKONM
+     END-IF.
+*    振り分け倉庫コード(変更後)チェック
+     IF     ( SOKO2     NOT =     SPACE )
+     AND    ( SOKO2     NOT =     "00"  )
+              MOVE      SOKO2     TO   SOK-F01
+              READ      ZSOKMS1
+                  INVALID  KEY
+                        MOVE      SPACE     TO   SOKNM2
+                        IF   ERR-FLG   =    ZERO
+                             MOVE      6    TO   ERR-FLG
+                        END-IF
+                        MOVE     "C"   TO   EDIT-CURSOR OF SOKO2
+                        MOVE     "R"   TO   EDIT-OPTION OF SOKO2
+              NOT INVALID  KEY
+                        MOVE      SOK-F02   TO   SOKNM2
+                        MOVE      SOKO2     TO   WK-SOKCD2
+              END-READ
+     ELSE
+              IF        ERR-FLG   =    ZERO
+                        MOVE      6    TO   ERR-FLG
+              END-IF
+              MOVE      "C"   TO   EDIT-CURSOR OF SOKO2
+              MOVE      "R"   TO   EDIT-OPTION OF SOKO2
+     END-IF.
+*    売上伝票データ存在チェック
+     IF  ERR-FLG        =    ZERO
+         MOVE      SPACE          TO   DEN-REC
+         INITIALIZE                    DEN-REC
+         MOVE      JDATE          TO   DEN-F46
+         MOVE      JTIME          TO   DEN-F47
+         MOVE      TORICD         TO   DEN-F01
+         MOVE      WK-SOKCD       TO   DEN-F48
+         START     SHTDENF   KEY  >=   DEN-F46   DEN-F47
+                                       DEN-F01   DEN-F48
+                                       DEN-F02   DEN-F04
+                                       DEN-F051  DEN-F07
+                                       DEN-F112  DEN-F03
+              INVALID   KEY
+                   MOVE      5    TO   ERR-FLG
+                   MOVE     "C"   TO   EDIT-CURSOR OF JDATE
+                   MOVE     "R"   TO   EDIT-OPTION OF JDATE
+                   MOVE     "R"   TO   EDIT-OPTION OF JTIME
+                   MOVE     "R"   TO   EDIT-OPTION OF TORICD
+                   IF   WK-SOKCD  NOT =     SPACE
+                        MOVE     "R"   TO   EDIT-OPTION OF SOKO
+                   END-IF
+                   GO   TO   220-GRP01-CHECK-EXIT
+                             IF    NOHBI    NOT =    SPACE
+                                   MOVE    "R"   TO
+                                            EDIT-OPTION OF NOHBI
+                             END-IF
+                             GO   TO   220-GRP01-CHECK-EXIT
+              NOT INVALID
+                   READ      SHTDENF   NEXT
+                     AT END
+                        MOVE      5    TO   ERR-FLG
+                        MOVE     "C"   TO   EDIT-CURSOR OF JDATE
+                        MOVE     "R"   TO   EDIT-OPTION OF JDATE
+                        MOVE     "R"   TO   EDIT-OPTION OF JTIME
+                        MOVE     "R"   TO   EDIT-OPTION OF TORICD
+                        MOVE     "R"   TO   EDIT-OPTION OF SOKO
+                        MOVE     "R"   TO   EDIT-OPTION OF NOHBI
+*                       MOVE     "R"   TO   EDIT-OPTION OF KUBUN
+                        GO   TO   220-GRP01-CHECK-EXIT
+                     NOT AT END
+                        IF ( JDATE     =    DEN-F46 ) AND
+                           ( JTIME     =    DEN-F47 ) AND
+                           ( TORICD    =    DEN-F01 )
+                             IF ( WK-SOKCD  NOT =    SPACE )
+                                  IF   SOKO     =     DEN-F48
+                                       CONTINUE
+                                  ELSE
+                                       MOVE  5   TO   ERR-FLG
+                                       MOVE "C"  TO
+                                            EDIT-CURSOR OF JDATE
+                                       MOVE "R"  TO
+                                            EDIT-OPTION OF JDATE
+                                            EDIT-OPTION OF JTIME
+                                            EDIT-OPTION OF TORICD
+                                            EDIT-OPTION OF SOKO
+                                            EDIT-OPTION OF NOHBI
+*                                           EDIT-OPTION OF KUBUN
+                                  END-IF
+                             ELSE
+                                  CONTINUE
+                             END-IF
+                        ELSE
+                             MOVE      5    TO   ERR-FLG
+                             MOVE "C"  TO   EDIT-CURSOR OF JDATE
+                             MOVE "R"  TO   EDIT-OPTION OF JDATE
+                             MOVE "R"  TO   EDIT-OPTION OF JTIME
+                             MOVE "R"  TO   EDIT-OPTION OF TORICD
+                             IF    WK-SOKCD NOT =    SPACE
+                                   MOVE    "R"   TO
+                                            EDIT-OPTION OF SOKO
+                             END-IF
+                             GO   TO   220-GRP01-CHECK-EXIT
+                             IF    NOHBI    NOT =    SPACE
+                                   MOVE    "R"   TO
+                                            EDIT-OPTION OF NOHBI
+                             END-IF
+                             GO   TO   220-GRP01-CHECK-EXIT
+                        END-IF
+                   END-READ
+         END-START
+     END-IF.
+*
+ 220-GRP01-CHECK-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      ｶｸﾆﾝ ﾆｭｳﾘｮｸ                                 *
+*--------------------------------------------------------------*
+ 230-INP-KKNN           SECTION.
+     MOVE     "230-INP-KKNN"      TO   S-NAME.
+     MOVE     "KKNN"         TO   WK-GRP.
+     PERFORM  900-DSP-READ.
+*
+     EVALUATE DSP-FNC
+         WHEN PF05
+              MOVE      99        TO   GR-NO
+              MOVE      4010      TO   PROGRAM-STATUS
+         WHEN PF04
+              MOVE      0         TO   GR-NO
+         WHEN PF06
+              MOVE      1         TO   GR-NO
+         WHEN ENT
+              PERFORM   CLR-TAIL-RTN
+              MOVE      10        TO   GR-NO
+         WHEN OTHER
+              MOVE      1         TO   ERR-FLG
+     END-EVALUATE.
+*
+ 230-INP-KKNN-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      振分倉庫　一括変更処理                      *
+*--------------------------------------------------------------*
+ 240-UPDT-SEC           SECTION.
+     MOVE     "240-UPDT-SEC"      TO   S-NAME.
+*
+     PERFORM   SHTDENF-UPDT-SEC   UNTIL  END-FLG-DEN = "END".
+*
+     PERFORM   BMSHACF-UPDT-SEC   UNTIL  END-FLG-HAC = "END".
+*
+     MOVE      99                 TO   GR-NO.
+*
+ 240-UPDT-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      振分倉庫　一括変更処理　（売上伝票ファイル）*
+*--------------------------------------------------------------*
+ SHTDENF-UPDT-SEC       SECTION.
+     MOVE     "SHTDENF-UPDT-SEC"  TO   S-NAME.
+*
+     IF ( JDATE     =    DEN-F46 ) AND
+        ( JTIME     =    DEN-F47 ) AND
+        ( TORICD    =    DEN-F01 ) AND
+        ( SOKO      =    DEN-F48 )
+          IF  NOHBI NOT =    ZERO
+              IF     NOHBI   =   DEN-F112
+                     ADD       1    TO     RD-CNT-DEN
+                     MOVE   SOKO2   TO     DEN-F48
+                     REWRITE        DEN-REC
+                     ADD       1    TO     RW-CNT-DEN
+              END-IF
+          ELSE
+              ADD       1    TO     RD-CNT-DEN
+              MOVE   SOKO2   TO     DEN-F48
+              REWRITE        DEN-REC
+              ADD       1    TO     RW-CNT-DEN
+          END-IF
+     ELSE
+          MOVE   "END"   TO     END-FLG-DEN
+          GO             TO     SHTDENF-UPDT-EXIT
+     END-IF.
+*
+     READ SHTDENF NEXT
+          AT END
+          MOVE   "END"   TO     END-FLG-DEN
+          GO             TO     SHTDENF-UPDT-EXIT
+     END-READ.
+*
+ SHTDENF-UPDT-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      振分倉庫　一括変更処理　（発注ＭＳＧ）　　　*
+*--------------------------------------------------------------*
+ BMSHACF-UPDT-SEC       SECTION.
+     MOVE     "BMSHACF-UPDT-SEC"  TO   S-NAME.
+*
+ BMSHACF-UPDT-01.
+*発注メッセージファイルスタート
+*TEST↓
+*    DISPLAY NC"発注ＭＳＧスタート" UPON CONS.
+*TEST↑
+     MOVE     SPACE               TO        HAC-REC.
+     INITIALIZE                             HAC-REC.
+     MOVE     JDATE               TO        HAC-F011.
+     MOVE     JTIME               TO        HAC-F012.
+     MOVE     TORICD              TO        HAC-F013.
+     MOVE     SOKO                TO        HAC-F02.
+     MOVE     NOHBI               TO        HAC-F346.
+***  MOVE     ZERO                TO        HAC-F302
+***                                         HAC-F308
+***                                         HAC-F402.
+     START    BMSHACF  KEY  >=    HAC-F011  HAC-F012
+                                  HAC-F013  HAC-F02
+                                  HAC-F346  HAC-F308
+                                  HAC-F302  HAC-F402
+              INVALID  KEY
+              MOVE     "END"      TO        END-FLG-HAC
+              MOVE     "4010"     TO        PROGRAM-STATUS
+              DISPLAY   NC"対象データがありません！１"
+                                            UPON  CONS
+              GO       TO         BMSHACF-UPDT-EXIT
+     END-START.
+*
+*T↓
+*    DISPLAY  "JDATE =" JTIME.
+*    DISPLAY  "JTIME =" JTIME.
+*    DISPLAY  "TORICD=" TORICD.
+*    DISPLAY  "SOKO  =" SOKO.
+*    DISPLAY  "SOKO2 =" SOKO2.
+*T↑
+ BMSHACF-UPDT-02.
+*
+     READ BMSHACF NEXT
+          AT END
+          MOVE   "END"   TO     END-FLG-HAC
+          GO             TO     BMSHACF-UPDT-EXIT
+     END-READ.
+*
+*T↓
+*    DISPLAY  "HAC-F011 =" HAC-F011.
+*    DISPLAY  "HAC-F012 =" HAC-F012.
+*    DISPLAY  "HAC-F013 =" HAC-F013.
+*    DISPLAY  "HAC-F02  =" HAC-F02.
+*    DISPLAY  "HAC-F346 =" HAC-F346.
+*T↑
+ BMSHACF-UPDT-03.
+     IF ( JDATE     =    HAC-F011 ) AND
+        ( JTIME     =    HAC-F012 ) AND
+        ( TORICD    =    HAC-F013 ) AND
+        ( SOKO      =    HAC-F02  )
+*T↓
+*         DISPLAY  "一致１"
+*T↑
+          IF  NOHBI NOT =    ZERO
+              IF     NOHBI   =   HAC-F346
+*T↓
+*                    DISPLAY  "一致２"
+*T↑
+                     ADD       1    TO     RD-CNT-HAC
+                     MOVE   SOKO2   TO     HAC-F02
+                     REWRITE        HAC-REC
+                     ADD       1    TO     RW-CNT-HAC
+              END-IF
+          ELSE
+              ADD       1    TO     RD-CNT-HAC
+              MOVE   SOKO2   TO     HAC-F02
+              REWRITE        HAC-REC
+              ADD       1    TO     RW-CNT-HAC
+          END-IF
+     ELSE
+*T↓
+*         DISPLAY  "不一致"
+*T↑
+          MOVE   "END"   TO     END-FLG-HAC
+          GO             TO     BMSHACF-UPDT-EXIT
+     END-IF.
+*
+*    READ BMSHACF NEXT
+*         AT END
+*         MOVE   "END"   TO     END-FLG-HAC
+*         GO             TO     BMSHACF-UPDT-EXIT
+*    END-READ.
+*
+     GO                  TO     BMSHACF-UPDT-02.
+*
+ BMSHACF-UPDT-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL ALL     ﾃﾞｨｽﾌﾟﾚｰ  READ                              *
+*--------------------------------------------------------------*
+ 900-DSP-READ           SECTION.
+     MOVE     "900-DSP-READ"      TO   S-NAME.
+     MOVE     "SCREEN"       TO   DSP-GRP.
+     IF       ERR-FLG   =    0
+              MOVE      SPACE               TO   MSG
+              MOVE      "D"      TO   EDIT-OPTION OF MSG
+     ELSE
+              MOVE      MSG-TBL (ERR-FLG)   TO   MSG
+     END-IF.
+     IF       GR-NO     =    1
+              MOVE      GUIDE01   TO   GUIDE
+     ELSE
+              MOVE      GUIDE02   TO   GUIDE
+     END-IF.
+     MOVE     WK-SYSYMD           TO   SYSYMD.
+     ACCEPT   SYS-TIME2      FROM TIME.
+     MOVE     SYS-TIMEW           TO   SYSTIM.
+*
+     PERFORM  900-DSP-WRITE.
+*
+     IF       MSG  NOT  =    SPACE
+              MOVE "AL"      TO   DSP-PRO
+     ELSE
+              MOVE "NE"      TO   DSP-PRO
+     END-IF.
+     MOVE     SPACE          TO   MSG.
+*
+     MOVE     WK-GRP         TO   DSP-GRP.
+     READ     DSPFILE.
+     MOVE     SPACE          TO   DSP-PRO.
+ 900-DSP-READ-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL ALL     ﾃﾞｨｽﾌﾟﾚｰ  WRITE                             *
+*--------------------------------------------------------------*
+ 900-DSP-WRITE          SECTION.
+     MOVE     "900-DSP-WRITE"     TO   S-NAME.
+     MOVE     SPACE          TO   DSP-PRO.
+     WRITE    FKE10011.
+ 900-DSP-WRITE-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      ＨＥＡＤ　属性クリア　　　　　　　　　　　　*
+*--------------------------------------------------------------*
+ CLR-HEAD-RTN           SECTION.
+     MOVE     " "            TO   EDIT-CURSOR OF JDATE
+                                  EDIT-CURSOR OF JTIME
+                                  EDIT-CURSOR OF TORICD
+                                  EDIT-CURSOR OF SOKO
+                                  EDIT-CURSOR OF SOKO2
+                                  EDIT-CURSOR OF NOHBI.
+*                                 EDIT-CURSOR OF KUBUN.
+     MOVE     "M"            TO   EDIT-OPTION OF JDATE
+                                  EDIT-OPTION OF JTIME
+                                  EDIT-OPTION OF TORICD
+                                  EDIT-OPTION OF SOKO
+                                  EDIT-OPTION OF SOKO2
+                                  EDIT-OPTION OF NOHBI.
+*                                 EDIT-OPTION OF KUBUN.
+ CLR-HEAD-EXIT.
+     EXIT.
+*--------------------------------------------------------------*
+*    LEVEL  3      ＴＡＩＬ　属性クリア　　　　　　　　　　　　*
+*--------------------------------------------------------------*
+ CLR-TAIL-RTN           SECTION.
+     MOVE     " "        TO   EDIT-CURSOR OF KKNN.
+     MOVE     "M"        TO   EDIT-OPTION OF KKNN.
+ CLR-TAIL-EXIT.
+     EXIT.
+*-----------------<< PROGRAM END >>----------------------------*
+
+```
