@@ -10,12 +10,21 @@
 source/
 ├── navs/                    # NAVSシステム
 │   ├── cobol/               # COBOLソースコード
-│   │   ├── programs/        # プログラム (.cob, .cbl)
+│   │   ├── programs/        # プログラム (.COB, .CL)
+│   │   │   ├── TOKSLIB/     # COBOLプログラム1 (911 files)
+│   │   │   ├── TOKSLIBS/    # COBOLプログラム2 (1,416 files)
+│   │   │   ├── TOKSRLIB/    # COBOLプログラム3 (850 files)
+│   │   │   ├── TOKCLIB/     # JCL (995 files)
+│   │   │   ├── TOKCLIBS/    # JCL (1,090 files)
+│   │   │   └── TOKCLLIB/    # JCL (463 files)
 │   │   └── copybooks/       # コピー句 (.cpy)
 │   ├── datas/               # データファイル
 │   ├── documents/           # 原本ドキュメント (Excel+画像)
 │   │   ├── displaies/       # 画面ドキュメント
-│   │   └── libraries/       # ライブラリドキュメント
+│   │   ├── menus/           # メニュー資料
+│   │   │   ├── 本社メニュー/  # 本社メニュー (261 files)
+│   │   │   └── 倉庫メニュー/  # 倉庫メニュー (272 files)
+│   │   └── 流通BMS登録情報/  # 流通BMS設定情報
 │   ├── function-specs/      # 機能仕様書
 │   ├── ライブラリ一覧.xlsx   # ライブラリ一覧 (原本)
 │   └── ライブラリ一覧.md     # ライブラリ一覧 (Markdown変換)
@@ -24,6 +33,18 @@ source/
 │
 └── ssc/                     # SSC関連
 ```
+
+## ファイル統計
+
+| ライブラリ | 種別 | ファイル数 |
+|-----------|------|----------:|
+| TOKSLIB | COBOL (.COB) | 911 |
+| TOKSLIBS | COBOL (.COB) | 1,412 |
+| TOKSRLIB | COBOL (.COB) | 850 |
+| TOKCLIB | JCL (.CL) + COBOL | 995 |
+| TOKCLIBS | JCL (.CL) | 1,090 |
+| TOKCLLIB | JCL (.CL) | 463 |
+| **合計** | | **5,721** |
 
 ## NAVSライブラリ構成
 

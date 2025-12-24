@@ -115,13 +115,22 @@ lib/
 source/
 ├── navs/                    # NAVS system source
 │   ├── cobol/               # COBOL source code
-│   │   ├── programs/        # Program files (.cob, .cbl)
+│   │   ├── programs/        # Program files (.COB, .CL)
+│   │   │   ├── TOKSLIB/     # COBOL programs 1 (911 files)
+│   │   │   ├── TOKSLIBS/    # COBOL programs 2 (1,416 files)
+│   │   │   ├── TOKSRLIB/    # COBOL programs 3 (850 files)
+│   │   │   ├── TOKCLIB/     # JCL (995 files)
+│   │   │   ├── TOKCLIBS/    # JCL (1,090 files)
+│   │   │   └── TOKCLLIB/    # JCL (463 files)
 │   │   └── copybooks/       # Copybooks (.cpy)
 │   ├── datas/               # Data files
 │   ├── documents/           # Original documents (Excel with images)
 │   │   ├── displaies/       # Screen documents
-│   │   └── libraries/       # Library documents
-│   └── function-specs/      # Function specifications
+│   │   ├── menus/           # Menu documents
+│   │   └── 流通BMS登録情報/  # Distribution BMS registration
+│   ├── function-specs/      # Function specifications
+│   ├── ライブラリ一覧.xlsx   # Library list (original)
+│   └── ライブラリ一覧.md     # Library list (Markdown)
 ├── regaze/
 └── ssc/
 ```
@@ -141,9 +150,9 @@ repository/                      # SQLite + React analysis tool
 │       ├── structure/           # Function structure
 │       ├── details/             # Function details
 │       └── dependencies/        # Dependencies
-├── document-mds/                # Markdown (converted from source/navs/documents)
+├── source-mds/                  # Source code Markdown (converted)
 │   ├── analysed-concepts/       # Analyzed concepts
-│   ├── libraries/               # Library documentation
+│   ├── libraries/               # COBOL/JCL → Markdown (5,725 files)
 │   └── summaries/               # Summaries
 ├── src/                         # Utility scripts
 └── indexes/                     # Search indexes
@@ -283,7 +292,7 @@ src/
 | `src/db-definitions/` | **NEW** system database definitions |
 | `source/` | **Legacy** source data (READ ONLY) |
 | `repository/` | **Legacy** analysis utility (SQLite + React) |
-| `repository/document-mds/` | Converted from `source/navs/documents/` (Excel→MD) |
+| `repository/source-mds/` | Converted from `source/navs/cobol/` (COBOL/JCL→MD) |
 | `analysis/` | Analysis results (legacy/business/data) |
 | `work/` | Personal temp work (git ignored) |
 | `work-records/` | Shared session records (git tracked) |
@@ -292,8 +301,8 @@ src/
 ### Data Flow (Legacy Analysis)
 
 ```
-source/navs/documents/     → [convert] → repository/document-mds/
-       (Excel+images)                         (Markdown)
+source/navs/cobol/programs/ → [convert] → repository/source-mds/libraries/
+       (.COB, .CL)                         ({name}-COB.md, {name}-CL.md)
 
 source/navs/function-specs/ → [parse] → repository/json/functions/
 source/navs/datas/          → [parse] → repository/json/datas/

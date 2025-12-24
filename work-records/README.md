@@ -6,8 +6,17 @@
 
 ```
 work-records/
+├── README.md
 └── {user}/                          # ユーザ別ディレクトリ
     └── session-YYYYMMDD-{task}.md   # セッション記録
+
+# 例:
+work-records/
+├── README.md
+├── claude-agent/
+│   └── session-20251225-agent-design.md
+└── yukihisa/
+    └── session-20260401-legacy-analysis.md
 ```
 
 ## 命名規則
