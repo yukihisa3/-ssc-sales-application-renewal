@@ -82,7 +82,10 @@ lib/
 | `nanobanana-cli` | Google Gemini Pro Image Generation CLI (Python) |
 | `claude-cli` | Claude API CLI (Python) - File input, Markdown output, session management |
 
-**Purpose**: AI/LLM tools for legacy system analysis and refactoring support.
+**Purpose**: AI/LLM tools for:
+- Legacy system analysis and refactoring support
+- Third-party evaluation and consulting
+- Document creation and review
 
 ### source/ Structure (Legacy Source Data - READ ONLY)
 
