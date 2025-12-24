@@ -124,6 +124,34 @@ analysis/
     └── quality/             # Data quality
 ```
 
+### pjm/ Structure (Project Management)
+
+```
+pjm/
+├── meetings/                # Meeting materials
+│   ├── steering/2026/       # Steering committee
+│   ├── weekly/2026/         # Weekly meetings
+│   ├── review/              # Review meetings
+│   └── adhoc/               # Ad-hoc meetings
+├── plans/                   # Project plans
+│   ├── master-schedule/
+│   ├── wbs/
+│   ├── milestones/
+│   └── resource/
+├── reports/                 # Reports
+│   ├── progress/            # Progress reports
+│   ├── issues/              # Issue tracking
+│   ├── risks/               # Risk management
+│   └── quality/             # Quality reports
+├── communications/          # Communications
+│   ├── minutes/             # Meeting minutes
+│   ├── decisions/           # Decision records
+│   └── announcements/       # Announcements
+└── templates/               # Document templates
+```
+
+**Note**: Contracts (proposals/quotations/agreements) are NOT managed in git.
+
 ### src/ Structure (Application Code)
 
 ```
@@ -201,6 +229,8 @@ src/
 | Business analysis | `analysis/business/` |
 | Data analysis | `analysis/data/` |
 | Design documents | `material/` |
+| Project management | `pjm/` |
+| Meeting materials | `pjm/meetings/` |
 | LLM agent working files | `work/` |
 
 ### Important Distinctions
