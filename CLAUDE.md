@@ -56,7 +56,7 @@ SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation
 ```
 project-root/
 ├── src/                 # New system application code (see below)
-├── lib/                 # External libraries (symlinks)
+├── lib/                 # External libraries (symlinks, see below)
 ├── material/            # Design documents & specifications
 ├── source/              # Legacy source data (NAVS/REGAZE/SSC)
 ├── repository/          # Legacy analysis utility (SQLite + React)
@@ -65,6 +65,15 @@ project-root/
 ├── pjm/                 # Project management
 ├── work/                # User/LLM agent working area
 └── temp/                # Utility script temp output
+```
+
+### lib/ Structure (External Libraries - Symlinks)
+
+```
+lib/
+├── openai-cli      → ../../openai-cli/lib/openai-cli
+├── nanobanana-cli  → ../../nanobanana-cli/lib/nanobanana-cli
+└── claude-cli      → ../../claude-cli/lib/claude-cli
 ```
 
 ### source/ Structure (Legacy Source Data - READ ONLY)
