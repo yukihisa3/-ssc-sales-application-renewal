@@ -19,7 +19,16 @@ SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation
 
 ### 2. README.md Verification Requirement
 - **MUST read and understand `README.md` at the start of each new conversation**
+- **Each subdirectory has its own `README.md`** - read it before working in that directory
 - Always select the appropriate directory for each task
+- Available subdirectory README.md files:
+  - `src/README.md` - Application source code structure
+  - `lib/README.md` - External AI/LLM tools
+  - `source/README.md` - Legacy source data (READ ONLY)
+  - `repository/README.md` - Legacy analysis utility
+  - `analysis/README.md` - Analysis results
+  - `pjm/README.md` - Project management
+  - `material/README.md` - Design documents
 
 ### 3. /tmp Usage Prohibited
 - **NEVER use the system `/tmp` directory**
