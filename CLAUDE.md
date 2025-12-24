@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation (株式会社サカタのタネ) Domestic Sales Division 2, involving NAVS system abolition and migration.
 
+## Copyright & Authorship
+
+- **Copyright**: Sakata Seed Corporation (株式会社サカタのタネ)
+- **Created/Updated by**: REGAZE Corporation (REGAZE株式会社)
+
 ## MANDATORY RULES (MUST FOLLOW)
 
 ### 1. File/Directory Creation Restrictions
