@@ -43,6 +43,8 @@ SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation
 - **DO NOT rely on ambiguous context memory** - persist important intermediate data, notes, and state to files
 - This ensures accuracy and prevents information loss across long conversations
 - **Note**: `temp/` is reserved for utility script output, use `work/` for LLM agent tasks
+- **Naming convention**: `work/session-YYYYMMDD-{task}.md`
+  - Example: `work/session-20260401-legacy-analysis.md`
 
 ### 6. Internet Research for Missing Information
 - **When information is not available in the project directory, MUST collect factual information from the internet**
