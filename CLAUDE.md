@@ -55,16 +55,73 @@ SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation
 
 ```
 project-root/
-├── src/                 # Application source code (see below)
+├── src/                 # New system application code (see below)
 ├── lib/                 # External libraries (symlinks)
 ├── material/            # Design documents & specifications
-├── source/              # Migration source data (NAVS/REGAZE/SSC)
-│   └── database/        # Legacy database exports
+├── source/              # Legacy source data (NAVS/REGAZE/SSC)
+├── repository/          # Legacy analysis utility (SQLite + React)
+├── database/            # Database files
+├── analysis/            # Analysis results (legacy/business/data)
 ├── pjm/                 # Project management
 ├── work/                # User/LLM agent working area
-├── temp/                # Utility script temp output (lib/util)
-├── analysis/            # Analysis & research
-└── repository-navs/     # NAVS repository related
+└── temp/                # Utility script temp output
+```
+
+### source/ Structure (Legacy Source Data - READ ONLY)
+
+```
+source/
+├── navs/                    # NAVS system source
+│   ├── cobol/               # COBOL source code
+│   │   ├── programs/        # Program files (.cob, .cbl)
+│   │   └── copybooks/       # Copybooks (.cpy)
+│   ├── datas/               # Data files
+│   ├── documents/           # Original documents (Excel with images)
+│   │   ├── displaies/       # Screen documents
+│   │   └── libraries/       # Library documents
+│   └── function-specs/      # Function specifications
+├── regaze/
+└── ssc/
+```
+
+### repository/ Structure (Legacy Analysis Utility)
+
+```
+repository/                      # SQLite + React analysis tool
+├── webapp/                      # React analysis UI
+├── database/                    # SQLite database
+├── json/                        # Structured data (parsed)
+│   ├── datas/
+│   │   ├── data-schema/         # Data schema definitions
+│   │   ├── forward-lookup/      # Name → Definition
+│   │   └── reverse-lookup/      # Definition → References
+│   └── functions/
+│       ├── structure/           # Function structure
+│       ├── details/             # Function details
+│       └── dependencies/        # Dependencies
+├── document-mds/                # Markdown (converted from source/navs/documents)
+│   ├── analysed-concepts/       # Analyzed concepts
+│   ├── libraries/               # Library documentation
+│   └── summaries/               # Summaries
+├── src/                         # Utility scripts
+└── indexes/                     # Search indexes
+```
+
+### analysis/ Structure (Analysis Results)
+
+```
+analysis/
+├── legacy/                  # Legacy system analysis
+│   ├── findings/            # Analysis findings
+│   ├── mapping/             # Old-new mapping
+│   └── gaps/                # Gap analysis
+├── business/                # Business analysis
+│   ├── processes/           # Business processes
+│   ├── requirements/        # Requirements
+│   └── use-cases/           # Use cases
+└── data/                    # Data analysis
+    ├── models/              # Data models
+    └── quality/             # Data quality
 ```
 
 ### src/ Structure (Application Code)
@@ -133,12 +190,16 @@ src/
 |------|-----------|
 | React component development | `src/webapp/` |
 | API endpoint implementation | `src/api/` |
-| Database schema changes | `src/db-definitions/` |
+| New DB schema changes | `src/db-definitions/` |
 | External API integration | `src/gateway/` |
 | Batch job creation | `src/ops/batch/` |
 | Shared type definitions | `src/shared/types/` |
 | Terraform/Docker | `src/infrastructure/` |
-| Legacy data analysis | `source/` |
+| Legacy source data | `source/` (READ ONLY) |
+| Legacy analysis tool | `repository/` |
+| Legacy analysis results | `analysis/legacy/` |
+| Business analysis | `analysis/business/` |
+| Data analysis | `analysis/data/` |
 | Design documents | `material/` |
 | LLM agent working files | `work/` |
 
@@ -147,9 +208,24 @@ src/
 | Directory | Purpose |
 |-----------|---------|
 | `src/db-definitions/` | **NEW** system database definitions |
-| `source/database/` | **Legacy** database exports for migration |
-| `work/` | **User/LLM agent** working area (notes, drafts, intermediate data) |
-| `temp/` | **Utility scripts** temp output only (lib/util scripts) |
+| `source/` | **Legacy** source data (READ ONLY) |
+| `repository/` | **Legacy** analysis utility (SQLite + React) |
+| `repository/document-mds/` | Converted from `source/navs/documents/` (Excel→MD) |
+| `analysis/` | Analysis results (legacy/business/data) |
+| `work/` | User/LLM agent working area |
+| `temp/` | Utility scripts temp output only |
+
+### Data Flow (Legacy Analysis)
+
+```
+source/navs/documents/     → [convert] → repository/document-mds/
+       (Excel+images)                         (Markdown)
+
+source/navs/function-specs/ → [parse] → repository/json/functions/
+source/navs/datas/          → [parse] → repository/json/datas/
+
+repository/json/            → [analyze] → analysis/legacy/
+```
 
 ## Commands
 
