@@ -29,6 +29,14 @@ SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation
 - **DO NOT rely on ambiguous context memory** - persist important intermediate data, notes, and state to files
 - This ensures accuracy and prevents information loss across long conversations
 
+### 6. Internet Research for Missing Information
+- **When information is not available in the project directory, MUST collect factual information from the internet**
+- **Use `curl` with appropriate User-Agent** instead of fetch tools (which have Agent specification issues)
+  ```bash
+  curl -A "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36" -s "URL"
+  ```
+- **Save raw responses to `{topic}/raw/`** directory for reference and traceability
+
 ## Directory Structure
 
 ```
