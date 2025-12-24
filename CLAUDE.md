@@ -23,16 +23,17 @@ SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation
 
 ### 3. /tmp Usage Prohibited
 - **NEVER use the system `/tmp` directory**
-- Use the `temp/` directory for temporary files
+- Use `work/` for LLM agent working files (notes, intermediate data, drafts)
 
 ### 4. Git Operation Rules
 - **Commit after each work session** (git commit)
 - **Push only when user gives approval** (e.g., "GJ", "Good Job", or explicit push request)
 
-### 5. Use Temporary Files Over Context Memory
-- **Actively create temporary files** in `temp/` or `work/` during task execution
+### 5. Use Working Files Over Context Memory
+- **Actively create working files** in `work/` during task execution
 - **DO NOT rely on ambiguous context memory** - persist important intermediate data, notes, and state to files
 - This ensures accuracy and prevents information loss across long conversations
+- **Note**: `temp/` is reserved for utility script output, use `work/` for LLM agent tasks
 
 ### 6. Internet Research for Missing Information
 - **When information is not available in the project directory, MUST collect factual information from the internet**
@@ -60,8 +61,8 @@ project-root/
 ├── source/              # Migration source data (NAVS/REGAZE/SSC)
 │   └── database/        # Legacy database exports
 ├── pjm/                 # Project management
-├── work/                # Working files
-├── temp/                # Temporary files
+├── work/                # User/LLM agent working area
+├── temp/                # Utility script temp output (lib/util)
 ├── analysis/            # Analysis & research
 └── repository-navs/     # NAVS repository related
 ```
@@ -139,7 +140,7 @@ src/
 | Terraform/Docker | `src/infrastructure/` |
 | Legacy data analysis | `source/` |
 | Design documents | `material/` |
-| Temporary work | `temp/` or `work/` |
+| LLM agent working files | `work/` |
 
 ### Important Distinctions
 
@@ -147,6 +148,8 @@ src/
 |-----------|---------|
 | `src/db-definitions/` | **NEW** system database definitions |
 | `source/database/` | **Legacy** database exports for migration |
+| `work/` | **User/LLM agent** working area (notes, drafts, intermediate data) |
+| `temp/` | **Utility scripts** temp output only (lib/util scripts) |
 
 ## Commands
 
