@@ -24,6 +24,11 @@ SSC Sales Application Renewal - Sales reform project for Sakata Seed Corporation
 - **Commit after each work session** (git commit)
 - **Push only when user gives approval** (e.g., "GJ", "Good Job", or explicit push request)
 
+### 5. Use Temporary Files Over Context Memory
+- **Actively create temporary files** in `temp/` or `work/` during task execution
+- **DO NOT rely on ambiguous context memory** - persist important intermediate data, notes, and state to files
+- This ensures accuracy and prevents information loss across long conversations
+
 ## Directory Structure
 
 ```
