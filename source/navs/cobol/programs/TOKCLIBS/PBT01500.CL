@@ -1,0 +1,109 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    業務改善（出荷改善）      　　　     *  ./
+/. *   JOB-ID      :    PBT01500                             *  ./
+/. *   JOB-NAME    :    オンライン出荷状況管理ファイル再作成 * ./
+/. *               :                                         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾊﾟﾗﾒﾀｴﾘｱ定義####./
+    VAR ?HIDUKE   ,STRING*8,VALUE-'        '    /.受信日付./
+    VAR ?JIKAN    ,STRING*4,VALUE-'    '        /.受信時間./
+    VAR ?TORICD   ,STRING*8,VALUE-'        '    /.受信取引先./
+    VAR ?ERRCD    ,STRING*1,VALUE-' '           /.エラーＣＤ./
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PBT01500'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+
+/.##実行PG名称ｾｯﾄ##./
+    ?PGNM := 'オンライン出荷状況管理ＤＴ再作成'
+
+/.###ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    DEFLIBL TOKELIB/TOKELIB/TOKFLIB/TOKKLIB
+
+/.##バッチ_入力##./
+SKZ0130I:
+
+    ?STEP :=   'SKZ0130I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF  FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF     FILE-SHTDENLA,TOFILE-SHTDENLA.TOKFLIB
+    OVRF     FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    CALL PGM-SKZ0130I.TOKELIBO,PARA-(?HIDUKE,?JIKAN,?TORICD)
+    IF        @PGMEC    ^=   0    THEN
+         IF   @PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO RTN
+         ELSE
+              GOTO ABEND
+         END
+    END
+
+/.##オンライン連携状況ファイル作成前削除##./
+SBT0155B:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-LNKONLL1,TOFILE-LNKONLL1.TOKKLIB
+    CALL      PGM-SBT0155B.TOKELIBO,PARA-(?HIDUKE,?JIKAN,?TORICD)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.##出荷状況ファイル作成##./
+SBT0150B:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-SHTDENLJ,TOFILE-SHTDENLJ.TOKKLIB
+    OVRF      FILE-LNKONLL1,TOFILE-LNKONLL1.TOKKLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    CALL      PGM-SBT0150B.TOKELIBO,PARA-(?HIDUKE,?JIKAN,?TORICD,
+                                         ?ERRCD)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    END
+    DSPLOG CLR-@YES,EDT-@JEF
+
+    RETURN    PGMEC-@PGMEC
+

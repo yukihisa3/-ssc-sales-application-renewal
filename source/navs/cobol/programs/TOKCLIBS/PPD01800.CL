@@ -1,0 +1,129 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    販売管理・内部統制対応               *  ./
+/. *   JOB-ID      :    PPD01800                             *  ./
+/. *   JOB-NAME    :    （手書連携）売上ＤＴ作成管理リスト   *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PPD01800'
+    VAR       ?STEP     ,STRING*8
+/.##ﾌｧｲﾙ名称編集用##./
+    VAR       ?WKSTN    ,NAME
+    VAR       ?WS       ,STRING*8,VALUE-'        '
+    VAR       ?MEMO     ,STRING*5,VALUE-'     '
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '
+    VAR       ?TANBUM   ,STRING*6
+    VAR       ?PGNM     ,STRING*40                 /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                 /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                 /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                 /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                 /.      5    ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '（手書連携）売上ＤＴ作成管理リスト'
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  '        '
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKFLIB/TOKELIB
+
+/.##部門ｺｰﾄﾞ取得##./
+SKY1602B:
+
+    ?STEP :=   'SKY1602B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1602B.TOKELIBO,PARA-(?WS,?BUMON)
+    IF        @PGMEC    ^=   0
+          THEN
+              ?KEKA4 :=  '【部門ＣＤ取得】'
+              GOTO ABEND
+    END
+
+/.##担当者CD指定##./
+SKY6101I:
+
+    ?STEP :=   'SKY6101I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-SKY6101I.TOKELIBO,PARA-(?BUMON,?TANCD)
+    IF        @PGMEC    ^=   0  THEN
+              IF  @PGMEC = 4010  THEN
+                  SNDMSG MSG-'##取消終了##',TO-XCTL
+                  RETURN
+              ELSE
+                  ?KEKA4 :=  '【担当者ＣＤ入力】'
+                  GOTO  ABEND
+              END
+    END
+
+/.##（手書連携）売上データ作成管理リスト##./
+SPD0180I:
+
+    ?STEP :=   'SPD0180I '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF      FILE-PCKANNL1,TOFILE-PCKANNL1.TOKKLIB
+    CALL      PGM-SPD0180L.TOKELIBO,PARA-(?BUMON,?TANCD)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【売上データ作成管理リスト発行】'
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+              /.１２３４５６７８９０１２３４５６７８９０./
+    ?KEKA1 :=  '（手書連携）売上ＤＴ作成管理リスト発行'
+    ?KEKA2 :=  '処理が異常終了しました。ログリストを採'
+    ?KEKA3 :=  '取してＮＡＶへ連絡して下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

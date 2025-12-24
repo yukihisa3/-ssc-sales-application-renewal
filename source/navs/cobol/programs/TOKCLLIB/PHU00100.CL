@@ -1,0 +1,267 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　本社システム                          *  ./
+/. *   SYSTEM-NAME :    種子実績関連　　　　                 *  ./
+/. *   JOB-ID      :    PHU00100                             *  ./
+/. *   JOB-NAME    :    ヨドバシ受注データ出力　　　         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PHU00100'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?TKBN     ,STRING*1,VALUE-' '           /.抽出区分      ./
+    VAR ?STTOKCD  ,STRING*8,VALUE-'        '    /.開始取引先　 ./
+    VAR ?EDTOKCD  ,STRING*8,VALUE-'        '    /.終了取引先    ./
+    VAR ?STDATE   ,STRING*8,VALUE-'        '    /.開始抽出日　　./
+    VAR ?EDDATE   ,STRING*8,VALUE-'        '    /.終了抽出日    ./
+    VAR ?STSOKCD  ,STRING*2,VALUE-'  '          /.開始倉庫　　  ./
+    VAR ?EDSOKCD  ,STRING*2,VALUE-'  '          /.終了倉庫      ./
+    VAR ?CATEG1   ,STRING*2,VALUE-'  '          /.カテゴリ１    ./
+    VAR ?CATEG2   ,STRING*2,VALUE-'  '          /.カテゴリ２    ./
+    VAR ?CATEG3   ,STRING*2,VALUE-'  '          /.カテゴリ３    ./
+    VAR ?BUNRU1   ,STRING*1,VALUE-' '           /.分類区分１　  ./
+    VAR ?BUNRU2   ,STRING*1,VALUE-' '           /.分類区分２　  ./
+    VAR ?BUNRU3   ,STRING*1,VALUE-' '           /.分類区分３　  ./
+    VAR ?KENSU1   ,STRING*7,VALUE-'0000000'     /.抽出件数./
+    VAR ?KENSU2   ,STRING*7,VALUE-'0000000'     /.抽出件数./
+    VAR ?SYORINM1 ,STRING*50
+    VAR ?SYORINM2 ,STRING*40
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門CD./
+    VAR ?TANCD8   ,STRING*8,VALUE-'        '    /.担当者CD./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+    VAR ?JISOKO   ,STRING*2,VALUE-'00'          /.倉庫(自)  ./
+    VAR ?DSOKO    ,STRING*2,VALUE-'00'          /.倉庫(代表)./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '注文日別受注データ出力'
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKKLIB/TOKDLIB/TOKDTLIB/TOKMDLIB
+
+/.##ログインユーザー情報取得##./
+STEP030:
+
+    ?STEP :=   'STEP030'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD8)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【ログインユーザー情報取得】'
+              GOTO ABEND
+    END
+    ?TANCD := ?TANCD8
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?JISOKO,?DSOKO)
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '【倉庫ＣＤ取得】'
+              GOTO ABEND
+    END
+
+/.##注文日別受注データ出力指示##./
+CHU0010I:
+
+    ?STEP :=   'CHU0010I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-CHU0010I.TOKSOLIB,PARA-(?TKBN,?STTOKCD,?EDTOKCD,
+              ?STDATE,?EDDATE,?STSOKCD,?EDSOKCD,?CATEG1,
+              ?CATEG2,?CATEG3,?BUNRU1,?BUNRU2,?BUNRU3)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+         IF   ?PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO RTN
+         ELSE
+              ?KEKA4 :=  '【注文日別受注データ出力指示】'
+              GOTO ABEND
+         END
+    END
+    ?MSGX :=  '#TKBN   =' && ?TKBN
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#STTOKCD=' && ?STTOKCD
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#EDTOKCD=' && ?EDTOKCD
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#STDATE =' && ?STDATE
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#EDDATE =' && ?EDDATE
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#STSOKCD=' && ?STSOKCD
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#EDSOKCD=' && ?EDSOKCD
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#CATEG1 =' && ?CATEG1
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#CATEG2 =' && ?CATEG2
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#CATEG3 =' && ?CATEG3
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#BUNRU1 =' && ?BUNRU1
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#BUNRU2 =' && ?BUNRU2
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '#BUNRU3 =' && ?BUNRU3
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##注文日別受注抽出データ初期化#./
+FILEDELE:
+
+    ?STEP :=   'FILEDELE'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CLRFILE CHUMONF.TOKDTLIB
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              SNDMSG '注文日別受注抽出ＤＴの初期化',TOWS-@ORGWS
+              SNDMSG '失敗！　他端末使用中？　　　',TOWS-@ORGWS
+              ?KEKA4 :=  '【ファイル排他：受注データ】'
+              GOTO ABEND
+    END
+
+/.##注文日別受注データ抽出（オンライン）##./
+CHU0020B:
+
+    IF  ?TKBN =  '2'  THEN  /.##抽出区分＝２の時は手書抽出へ##./
+        GOTO     CHU0030B
+    END
+    ?STEP :=   'CUH0020B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-CHUMONL1,TOFILE-CHUMONL1.TOKDTLIB
+    OVRF      FILE-SUBMEIL1,TOFILE-SUBMEIL1.TOKDTLIB
+    CALL      PGM-CHU0020B.TOKSOLIB,PARA-(?STTOKCD,?EDTOKCD,
+              ?STDATE,?EDDATE,?STSOKCD,?EDSOKCD,?CATEG1,
+              ?CATEG2,?CATEG3,?BUNRU1,?BUNRU2,?BUNRU3)
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+        ?KEKA4 :=  '【注文日別受注データ抽出（オンライン）】'
+              GOTO ABEND END
+    IF  ?TKBN =  '1'  THEN  /.##抽出区分＝２の時は手書抽出へ##./
+        GOTO     CHU0040V
+    END
+
+/.##注文日別受注データ抽出（手書き)##./
+CHU0030B:
+
+    ?STEP :=   'CUH0030B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-CHUMONL1,TOFILE-CHUMONL1.TOKDTLIB
+    OVRF      FILE-SUBMEIL1,TOFILE-SUBMEIL1.TOKDTLIB
+    CALL      PGM-CHU0030B.TOKSOLIB,PARA-(?STTOKCD,?EDTOKCD,
+              ?STDATE,?EDDATE,?STSOKCD,?EDSOKCD,?CATEG1,
+              ?CATEG2,?CATEG3,?BUNRU1,?BUNRU2,?BUNRU3)
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+        ?KEKA4 :=  '【注文日別受注データ抽出（手書き)】'
+              GOTO ABEND END
+
+/.##注文日別受注抽出データＣＳＶ出力##./
+CHU0040V:
+
+    ?STEP :=   'CUH0040V'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-CHUMONL1,TOFILE-CHUMONL1.TOKDTLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-SUBMEIL1,TOFILE-SUBMEIL1.TOKDTLIB
+    OVRF      FILE-CHUMONDT,TOFILE-CHUMONDT.TOKDTLIB
+    CALL      PGM-CHU0040V.TOKSOLIB
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+        ?KEKA4 :=  '【注文日別受注抽出データＣＳＶ出力】'
+              GOTO ABEND END
+
+/.##データ転送##./
+PFIMPORT:
+
+    ?STEP :=   'FIMPORT1'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    FIMPORT FILE-CHUMONDT.TOKDTLIB,PARA-CHUMON,UNIT-1
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+          IF  ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【データ転送】'
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+ABEND:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '注文日別受注データ抽出が異常終了しま'
+    ?KEKA2 :=  'した。ログを採取してＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+ /. ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM  ./
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

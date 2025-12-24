@@ -1,0 +1,129 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　営業第２部　ＮＡＶＳ基幹　　　        *  ./
+/. *   SYSTEM-NAME :    在庫移動処理　　　　　　  　　　     *  ./
+/. *   JOB-ID      :    PVD04560                             *  ./
+/. *   JOB-NAME    :    在庫移動用商品情報データ抽出　　　　 *  ./
+/. *               :                                         *  ./
+/. ***********************************************************  ./
+/.###ﾊﾟﾗﾒﾀ 定義####./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義###./
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PVD04560'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1./
+    VAR ?KEKA1    ,STRING*40                    /.      2./
+    VAR ?KEKA2    ,STRING*40                    /.      3./
+    VAR ?KEKA3    ,STRING*40                    /.      4./
+    VAR ?KEKA4    ,STRING*40                    /.      5./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門名./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+/.###出力パラメタ用###./
+    VAR ?NSKENSU  ,STRING*10,VALUE-'0000000000' /.入荷実績件数./
+    VAR ?SGKENSU  ,STRING*10,VALUE-'0000000000' /.作業実績件数./
+    VAR ?OPR1     ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?OPR2     ,STRING*50                  /.      2    ./
+    VAR ?OPR3     ,STRING*50                  /.      3    ./
+    VAR ?OPR4     ,STRING*50                  /.      4    ./
+    VAR ?OPR5     ,STRING*50                  /.      5    ./
+
+/.###ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB/TOKDTLIB/TOKELIB/TOKELIBO
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '在庫移動用商品情報データ抽出'
+
+/.##ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.##確認画面##./
+STEP010:
+
+    ?OPR1  :=  '【在庫移動用商品情報データ抽出】'
+    ?OPR2  :=  '在庫移動ＥＸＣＥＬ用の商品情報データの抽出を'
+    ?OPR3  :=  '行ないます。　　　　　　　　　　　　　'
+    ?OPR4  :=  '実行ＯＫか確認してください。　　　　　　　　'
+    ?OPR5  :=  'データ作成後は、ＥＸＣＥＬ内の取込を実行！！'
+    CALL      OHOM0900.XUCL,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+/.##在庫移動用商品情報データ抽出##./
+NVD0456B:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CALL PGM-NVD0456B.TOKSOLIB
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '在庫移動用商品情報データ抽出'
+              GOTO ABEND
+    END
+
+/.##在庫移動用商品情報データ転送##./
+PFIMPORT:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    FIMPORT FILE-IDOMEISF.TOKDTLIB,PARA-IDOXXXCS,UNIT-2
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '在庫移動用商品情報データ転送'
+              GOTO ABEND
+    END
+
+RTN:
+
+              /.１２３４５６７８９０１２３４５６７８９０./
+    ?KEKA1 :=  '在庫移動用商品情報データ抽出処理が'
+    ?KEKA2 :=  '正常終了しました。送信して下さい。'
+    ?KEKA3 :=  ''
+    ?KEKA4 :=  ''
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+              /.１２３４５６７８９０１２３４５６７８９０./
+    ?KEKA1 :=  '在庫移動用商品情報データ抽出処理異常！'
+    ?KEKA2 :=  'ログリスト等を採取しＮＡＶへ連絡して下'
+    ?KEKA3 :=  'さい。'
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO ?MSGX :=   ?MSG(?I)
+           SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+
+    RETURN    PGMEC-@PGMEC
+

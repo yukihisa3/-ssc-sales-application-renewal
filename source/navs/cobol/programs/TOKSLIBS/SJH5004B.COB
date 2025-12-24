@@ -1,0 +1,1252 @@
+****************************************************************
+*    顧客名　　　　　　　：　（株）サカタのタネ殿　　　　　　　*
+*    サブシステム　　　　：　出荷管理　　　　　　　　　　　　　*
+*    業務名　　　　　　　：　ベンダーオンライン　　　　　　　　*
+*    モジュール名　　　　：　発注データ変換処理（新）　　　　　*
+*    作成日／更新日　　　：　10/03/24                          *
+*    作成者／更新者　　　：　NAV                               *
+*    処理概要　　　　　　：　（ＣＶＣＳ）オンラインデータから　*
+*                            変換伝票データファイルを作成する　*
+*                            トステムビバ（新EDI）　
+*    北海道取引先対応                                          *
+****************************************************************
+ IDENTIFICATION         DIVISION.
+*
+ PROGRAM-ID.            SJH5004B.
+ AUTHOR.                NAV.
+ DATE-WRITTEN.          10/03/24.
+*
+ ENVIRONMENT            DIVISION.
+ CONFIGURATION          SECTION.
+ SOURCE-COMPUTER.       FUJITSU.
+ OBJECT-COMPUTER.       FUJITSU.
+ SPECIAL-NAMES.
+     CONSOLE  IS        CONS.
+ INPUT-OUTPUT           SECTION.
+ FILE-CONTROL.
+*受信データファイル
+     SELECT   CVCSG001  ASSIGN    TO        DA-01-S-CVCSG001
+                        ACCESS    MODE IS   SEQUENTIAL
+                        FILE      STATUS    DEN-STATUS
+                        ORGANIZATION   IS   SEQUENTIAL.
+*売上伝票ファイル（当日）
+     SELECT   JHSHENL1  ASSIGN    TO        DA-01-VI-JHSHENL1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      SEQUENTIAL
+                        RECORD    KEY                 HEN-F46
+                                            HEN-F47   HEN-F01
+                                            HEN-F02   HEN-F03
+                        FILE  STATUS   IS   HEN-STATUS.
+*基本情報データ         2010/03/25 ADD
+     SELECT   KHJOHOL1  ASSIGN    TO        DA-01-VI-KHJOHOL1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      SEQUENTIAL
+                        RECORD    KEY       KHJ-F01   KHJ-F02
+                                            KHJ-F03   KHJ-F04
+                                            KHJ-F05   KHJ-F06
+                                            KHJ-F07   KHJ-F08
+                        FILE  STATUS   IS   KHJ-STATUS.
+*取引先マスタ
+     SELECT   TOKMS2    ASSIGN    TO        DA-01-VI-TOKMS2
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      RANDOM
+                        RECORD    KEY       TOK-F01
+                        FILE  STATUS   IS   TOK-STATUS.
+*商品変換テーブル
+     SELECT   SHOTBL1   ASSIGN    TO        DA-01-VI-SHOTBL1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      RANDOM
+                        RECORD    KEY       TBL-F01   TBL-F02
+                        FILE STATUS    IS   TBL-STATUS.
+*商品名称マスタ
+     SELECT   MEIMS1    ASSIGN    TO        DA-01-VI-MEIMS1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      RANDOM
+                        RECORD    KEY       MEI-F011
+                                            MEI-F012
+                        FILE STATUS    IS   MEI-STATUS.
+*ルート条件マスタ
+     SELECT   JHMRUTL1  ASSIGN    TO        DA-01-VI-JHMRUTL1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      RANDOM
+                        RECORD    KEY       RUT-F01   RUT-F02
+                                            RUT-F03
+                        FILE STATUS    IS   RUT-STATUS.
+*店舗マスタ
+     SELECT   HTENMS    ASSIGN    TO        DA-01-VI-TENMS1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      RANDOM
+                        RECORD    KEY       TEN-F52   TEN-F011
+                        FILE      STATUS    TEN-STATUS.
+*出荷場所件数マスタ
+     SELECT   JHMKENL1  ASSIGN    TO        DA-01-VI-JHMKENL1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      RANDOM
+                        RECORD    KEY       KEN-F01   KEN-F02
+                                            KEN-F03   KEN-F04
+                        FILE  STATUS   IS   KEN-STATUS.
+*当日スケジュールマスタ
+     SELECT   JHMTJSL1  ASSIGN    TO        DA-01-VI-JHMTJSL1
+                        ORGANIZATION        INDEXED
+                        ACCESS    MODE      RANDOM
+                        RECORD    KEY       TJS-F01  TJS-F02
+                                            TJS-F03
+                        FILE  STATUS   IS   TJS-STATUS.
+*ＶＬＤ５００
+     SELECT   VLD500    ASSIGN    TO        VLD500
+                        FILE  STATUS   IS   VLD-STATUS.
+*********
+ DATA                   DIVISION.
+ FILE                   SECTION.
+******************************************************************
+*    受信データ　ＲＬ＝　128　  ＢＦ＝　1
+******************************************************************
+ FD  CVCSG001
+                        BLOCK CONTAINS      1    RECORDS
+                        LABEL RECORD   IS   STANDARD.
+*
+ 01  DEN-REC.
+     03  DEN-01A                  PIC  X(01).
+     03  DEN-01B                  PIC  X(02).
+     03  DEN-01C                  PIC  X(125).
+******************************************************************
+*    取引先マスタ
+******************************************************************
+ FD  TOKMS2             LABEL RECORD   IS   STANDARD.
+     COPY     HTOKMS    OF        XFDLIB
+              JOINING   TOK       PREFIX.
+******************************************************************
+*    商品変換テーブル
+******************************************************************
+ FD  SHOTBL1            LABEL RECORD   IS   STANDARD.
+     COPY     HSHOTBL   OF        XFDLIB
+              JOINING   TBL       PREFIX.
+******************************************************************
+*    商品名称マスタ
+******************************************************************
+ FD  MEIMS1             LABEL RECORD   IS   STANDARD.
+     COPY     HMEIMS    OF        XFDLIB
+              JOINING   MEI       PREFIX.
+******************************************************************
+*    ルート条件マスタ
+******************************************************************
+ FD  JHMRUTL1           LABEL RECORD   IS   STANDARD.
+     COPY     JHMRUTF   OF        XFDLIB
+              JOINING   RUT       PREFIX.
+******************************************************************
+*    店舗マスタ
+******************************************************************
+ FD  HTENMS             BLOCK     CONTAINS   8   RECORDS
+                        LABEL     RECORD     IS  STANDARD.
+     COPY     HTENMS    OF   XFDLIB    JOINING   TEN  AS   PREFIX.
+******************************************************************
+*    出荷場所別件数ファイル
+******************************************************************
+ FD  JHMKENL1           LABEL RECORD   IS   STANDARD.
+     COPY     JHMKENF   OF        XFDLIB
+              JOINING   KEN       PREFIX.
+******************************************************************
+*    当日スケジュールマスタ
+******************************************************************
+ FD  JHMTJSL1           LABEL RECORD   IS   STANDARD.
+     COPY     JHMTJSF   OF        XFDLIB
+              JOINING   TJS       PREFIX.
+******************************************************************
+*    売上伝票ファイル（当日）
+******************************************************************
+ FD  JHSHENL1
+                        LABEL RECORD   IS   STANDARD.
+     COPY     TSSHIRED  OF        XFDLIB
+              JOINING   HEN  AS   PREFIX.
+******************************************************************
+*    基本情報データ
+******************************************************************
+ FD  KHJOHOL1
+                        LABEL RECORD   IS   STANDARD.
+     COPY     KHJOHOF   OF        XFDLIB
+              JOINING   KHJ  AS   PREFIX.
+
+******************************************************************
+*    ＶＬＤ５００
+******************************************************************
+ FD  VLD500.
+ 01  VLD-REC.
+     03  VLD-F01           PIC  X(02).
+     03  VLD-F02           PIC  9(03).
+     03  VLD-F03           PIC  X(02).
+     03  VLD-F04           PIC  X(08).
+     03  VLD-F05           PIC  9(06).
+     03  VLD-F06           PIC  9(01).
+     03  VLD-F07           PIC  X(02).
+     03  VLD-F08           PIC  9(02).
+     03  VLD-F09           PIC  9(02).
+     03  VLD-F10           PIC  9(04).
+     03  VLD-F11           PIC  9(08).
+     03  VLD-F12           PIC  9(04).
+     03  VLD-F13           PIC  9(08).
+     03  FILLER            PIC  X(48).
+*
+*****************************************************************
+*
+ WORKING-STORAGE        SECTION.
+*    ｶｳﾝﾄ
+ 01  END-FG                  PIC  9(01)     VALUE  ZERO.
+ 01  IDX                     PIC  9(02)     VALUE  ZERO.
+ 01  RD-CNT                  PIC  9(08)     VALUE  ZERO.
+ 01  WRT-CNT1                PIC  9(08)     VALUE  ZERO.
+ 01  WRT-CNT2                PIC  9(08)     VALUE  ZERO.
+ 01  CNT-KENSU               PIC  9(08)     VALUE  ZERO.
+ 01  CNT-KENSU-D             PIC  9(08)     VALUE  ZERO.
+ 01  CNT-MAISU               PIC  9(08)     VALUE  ZERO.
+ 01  INV-RUT                 PIC  9(01)     VALUE  ZERO.
+ 01  FLG-TOK                 PIC  9(01)     VALUE  ZERO.
+ 01  WK-TOKCD                PIC  9(08)     VALUE  ZERO.
+ 01  WK-TOKCD1               PIC  9(08)     VALUE  ZERO.
+ 01  WK-TOKCD2               PIC  9(08)     VALUE  ZERO.
+ 01  WK-TOKCD3               PIC  9(08)     VALUE  ZERO.
+ 01  HTENMS-INV-FLG          PIC  X(03)     VALUE  SPACE.
+ 01  WK-TOKCD-CHK1           PIC  X(01)     VALUE  SPACE.
+ 01  WK-TOKCD-CHK2           PIC  X(01)     VALUE  SPACE.
+ 01  WK-DEN-MAISU1           PIC  9(08)     VALUE  ZERO.
+ 01  WK-DEN-KENSU1           PIC  9(08)     VALUE  ZERO.
+ 01  WK-DEN-MAISU2           PIC  9(08)     VALUE  ZERO.
+ 01  WK-DEN-KENSU2           PIC  9(08)     VALUE  ZERO.
+ 01  WK-HEN-F02              PIC  9(09)     VALUE  ZERO.
+*基本情報ワーク
+ 01  WK-KHJ-SOKO             PIC  X(02)     VALUE  SPACE.
+ 01  WK-KHJ-NOUBI            PIC  9(08)     VALUE  ZERO.
+ 01  WK-KHJ-HACBI            PIC  9(08)     VALUE  ZERO.
+*ルート変換
+ 01  HEN-RUT.
+     03  HEN-RUT-1           PIC  X(01)     VALUE  "0".
+     03  HEN-RUT-2           PIC  X(01)     VALUE  SPACE.
+*
+*伝票ヘッダ（１）
+ 01  WK-DEPA-REC.
+     03  WK-DEPA01          PIC  X(01).
+     03  WK-DEPA02          PIC  X(02).
+     03  WK-DEPA03          PIC  9(06).
+     03  WK-DEPA04          PIC  9(01).
+     03  WK-DEPA05          PIC  9(03).
+     03  WK-DEPA06          PIC  9(04).
+     03  WK-DEPA07          PIC  9(04).
+     03  WK-DEPA08          PIC  9(02).
+     03  WK-DEPA09          PIC  9(05).
+     03  WK-DEPA10          PIC  9(06).
+     03  WK-DEPA11          PIC  9(06).
+     03  WK-DEPA12          PIC  X(03).
+     03  WK-DEPA13          PIC  X(20).
+     03  WK-DEPA14          PIC  X(20).
+     03  WK-DEPA15          PIC  X(20).
+     03  WK-DEPA16          PIC  X(10).
+     03  WK-DEPA17          PIC  X(02).
+     03  WK-DEPA18          PIC  X(01).
+     03  WK-DEPA19          PIC  X(01).
+     03  WK-DEPA20          PIC  X(11).
+*伝票ヘッダ（２）
+ 01  WK-DEPB-REC.
+     03  WK-DEPB01          PIC  X(01).
+     03  WK-DEPB02          PIC  X(02).
+     03  WK-DEPB03          PIC  X(01).
+     03  WK-DEPB04          PIC  X(30).
+     03  WK-DEPB05          PIC  X(20).
+     03  WK-DEPB06          PIC  X(20).
+     03  WK-DEPB07          PIC  X(17).
+     03  WK-DEPB08          PIC  X(17).
+     03  WK-DEPB09          PIC  X(12).
+     03  WK-DEPB10          PIC  X(01).
+     03  WK-DEPB11          PIC  X(04).
+     03  WK-DEPB12          PIC  X(03).
+*    明細レコード退避ワーク
+ 01  WK-DEPD-REC.
+     03  WK-DEPD01          PIC  X(01).
+     03  WK-DEPD02          PIC  X(02).
+     03  WK-DEPD03          PIC  9(02).
+     03  WK-DEPD04          PIC  X(08).
+     03  WK-DEPD05          PIC  X(02).
+     03  WK-DEPD06          PIC  9(03).
+     03  WK-DEPD07          PIC  9(05).
+     03  WK-DEPD08          PIC  X(03).
+     03  WK-DEPD09          PIC  9(05).
+     03  WK-DEPD10          PIC  X(01).
+     03  WK-DEPD11          PIC  9(07)V9(02).
+     03  WK-DEPD12          PIC  9(07).
+     03  WK-DEPD13          PIC  9(09).
+     03  WK-DEPD14          PIC  9(09).
+     03  WK-DEPD15          PIC  X(25).
+     03  WK-DEPD16          PIC  X(15).
+     03  WK-DEPD17          PIC  9(13).
+     03  WK-DEPD18          PIC  X(09).
+*
+ 01  WK-AREA.
+*システム日付の編集
+     03  SYS-DATE          PIC 9(06).
+     03  SYS-DATEW         PIC 9(08).
+ 01  WK-ST.
+     03  DEN-STATUS        PIC  X(02).
+     03  HEN-STATUS        PIC  X(02).
+     03  KHJ-STATUS        PIC  X(02).
+     03  TOK-STATUS        PIC  X(02).
+     03  TBL-STATUS        PIC  X(02).
+     03  MEI-STATUS        PIC  X(02).
+     03  RUT-STATUS        PIC  X(02).
+     03  KEN-STATUS        PIC  X(02).
+     03  TJS-STATUS        PIC  X(02).
+     03  VLD-STATUS        PIC  X(02).
+     03  TEN-STATUS        PIC  X(02).
+*取引先ＣＤ変換（文字⇒数値）
+ 01  WK-TORICD             PIC  X(06).
+ 01  WK-TORICD-R           REDEFINES  WK-TORICD.
+     03  WK-HEN-TORICD     PIC  9(06).
+*伝票番号ＣＤ変換（文字⇒数値）
+ 01  WK-DENNO              PIC  X(08).
+ 01  WK-DENNO-R            REDEFINES  WK-DENNO.
+     03  WK-HEN-DENNO      PIC  9(08).
+*
+ 01  MSG-AREA.
+     03  MSG-START.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  ST-PG          PIC   X(08)  VALUE "SJH5004B".
+         05  FILLER         PIC   X(11)  VALUE
+                                         " START *** ".
+     03  MSG-END.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  END-PG         PIC   X(08)  VALUE "SJH5004B".
+         05  FILLER         PIC   X(11)  VALUE
+                                         " END   *** ".
+     03  MSG-ABEND.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  END-PG         PIC   X(08)  VALUE "SJH5004B".
+         05  FILLER         PIC   X(11)  VALUE
+                                         " ABEND *** ".
+     03  MSG-WARNING.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  END-PG         PIC   X(08)  VALUE "SJH5004B".
+         05  FILLER         PIC   X(15)  VALUE
+                                         " ｽﾃﾞﾆｼｮﾘｽﾞﾐﾃﾞｽ]".
+     03  ABEND-FILE.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  AB-FILE        PIC   X(08).
+         05  FILLER         PIC   X(06)  VALUE " ST = ".
+         05  AB-STS         PIC   X(02).
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+     03  SEC-NAME.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  FILLER         PIC   X(07)  VALUE " SEC = ".
+         05  S-NAME         PIC   X(30).
+     03  MSG-IN.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  FILLER         PIC   X(09)  VALUE " INPUT = ".
+         05  IN-CNT         PIC   9(06).
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+     03  MSG-OUT1.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  FILLER         PIC   X(10)  VALUE " OUTPUT1= ".
+         05  OUT-CNT1        PIC   9(06).
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+     03  MSG-OUT2.
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+         05  FILLER         PIC   X(10)  VALUE " OUTPUT2= ".
+         05  OUT-CNT2        PIC   9(06).
+         05  FILLER         PIC   X(05)  VALUE " *** ".
+*
+ 01  LINK-AREA.
+     03  LINK-IN-KBN        PIC   X(01).
+     03  LINK-IN-YMD6       PIC   9(06).
+     03  LINK-IN-YMD8       PIC   9(08).
+     03  LINK-OUT-RET       PIC   X(01).
+     03  LINK-OUT-YMD8      PIC   9(08).
+*
+ LINKAGE                SECTION.
+ 01  PARA-AREA.
+     03  PARA-JDATE         PIC   9(08).
+     03  PARA-JTIME         PIC   9(04).
+     03  PARA-KSYU          PIC   X(01).
+     03  PARA-YUSEN         PIC   X(01).
+*
+******************************************************************
+*             M A I N             M O D U L E                    *
+******************************************************************
+ PROCEDURE              DIVISION USING PARA-AREA.
+ DECLARATIVES.
+ FILEERR-SEC1           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   CVCSG001.
+     MOVE      "CVCSG001"   TO   AB-FILE.
+     MOVE      DEN-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC2           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   JHSHENL1.
+     MOVE      "JHSHENL1"   TO   AB-FILE.
+     MOVE      HEN-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC3           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   KHJOHOL1.
+     MOVE      "KHJOHOL1"   TO   AB-FILE.
+     MOVE      KHJ-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC4           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   TOKMS2.
+     MOVE      "TOKMS2"     TO   AB-FILE.
+     MOVE      TOK-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC5           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   SHOTBL1.
+     MOVE      "SHOTBL1"    TO   AB-FILE.
+     MOVE      TBL-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC6           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   MEIMS1.
+     MOVE      "MEIMS1"     TO   AB-FILE.
+     MOVE      MEI-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC7           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   JHMKENL1.
+     MOVE      "JHMKENL1"   TO   AB-FILE.
+     MOVE      KEN-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC8           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   JHMTJSL1.
+     MOVE      "JHMTJSL1"   TO   AB-FILE.
+     MOVE      TJS-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC9           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   JHMRUTL1.
+     MOVE      "JHMRUTL1"   TO   AB-FILE.
+     MOVE      RUT-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC10           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   VLD500.
+     MOVE      "VLD500  "   TO   AB-FILE.
+     MOVE      VLD-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ FILEERR-SEC11          SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   HTENMS.
+     MOVE      "TENMS1  "   TO   AB-FILE.
+     MOVE      TEN-STATUS   TO   AB-STS.
+     DISPLAY   MSG-ABEND         UPON CONS.
+     DISPLAY   SEC-NAME          UPON CONS.
+     DISPLAY   ABEND-FILE        UPON CONS.
+     MOVE      4000         TO   PROGRAM-STATUS.
+     STOP      RUN.
+*
+ END     DECLARATIVES.
+*****************************************************************
+*                                                                *
+******************************************************************
+ GENERAL-PROCESS       SECTION.
+*
+     MOVE     "PROCESS-START"     TO   S-NAME.
+     PERFORM  INIT-SEC.
+     PERFORM  MAIN-SEC
+              UNTIL     END-FG    =    9.
+     PERFORM  END-SEC.
+*
+****************************************************************
+*　　　　　　　初期処理　　　　　　　　　　　　　　　　　　　　*
+****************************************************************
+ INIT-SEC               SECTION.
+     MOVE     "INIT-SEC"          TO   S-NAME.
+     OPEN     INPUT     CVCSG001
+                        SHOTBL1   MEIMS1  HTENMS
+                        JHMRUTL1  TOKMS2.
+     OPEN     EXTEND    JHSHENL1.
+     OPEN     I-O       JHMKENL1  JHMTJSL1  KHJOHOL1.
+     OPEN     OUTPUT    VLD500.
+     DISPLAY  MSG-START UPON CONS.
+*
+     MOVE     ZERO      TO        END-FG    RD-CNT   WRT-CNT1
+                                                     WRT-CNT2.
+     MOVE     ZERO      TO        IN-CNT    OUT-CNT1 OUT-CNT2.
+     MOVE     SPACE     TO        WK-DEPB-REC.
+     INITIALIZE                   WK-DEPB-REC.
+     MOVE     SPACE     TO        WK-DEPD-REC.
+     INITIALIZE                   WK-DEPD-REC.
+*
+******************
+*システム日付編集*
+******************
+     ACCEPT      SYS-DATE  FROM      DATE.
+     MOVE       "3"        TO        LINK-IN-KBN.
+     MOVE        SYS-DATE  TO        LINK-IN-YMD6.
+     CALL       "SKYDTCKB"   USING   LINK-IN-KBN
+                                     LINK-IN-YMD6
+                                     LINK-IN-YMD8
+                                     LINK-OUT-RET
+                                     LINK-OUT-YMD8.
+     IF          LINK-OUT-RET   =    ZERO
+         MOVE    LINK-OUT-YMD8  TO   SYS-DATEW
+     ELSE
+         MOVE    ZERO           TO   SYS-DATEW
+     END-IF.
+*基本情報ファイル存在チェック
+     MOVE      SPACE            TO   KHJ-REC.
+     INITIALIZE                      KHJ-REC.
+     MOVE      PARA-JDATE       TO   KHJ-F01.
+     MOVE      PARA-JTIME       TO   KHJ-F02.
+     MOVE      38709            TO   KHJ-F03.
+     START     KHJOHOL1 KEY >=  KHJ-F01 KHJ-F02 KHJ-F03
+                                KHJ-F04 KHJ-F05 KHJ-F06
+                                KHJ-F07 KHJ-F08
+           INVALID   KEY
+               CONTINUE
+           NOT INVALID
+               READ  KHJOHOL1
+                  AT END
+                     CONTINUE
+                  NOT AT END
+                     IF ( PARA-JDATE = KHJ-F01 ) AND
+                        ( PARA-JTIME = KHJ-F02 ) AND
+                        ( KHJ-F03    = 38709   )
+                          DISPLAY    MSG-WARNING UPON CONS
+                          MOVE  9    TO END-FG
+                     END-IF
+               END-READ
+     END-START.
+*基本情報ファイル存在チェック
+     MOVE      SPACE            TO   KHJ-REC.
+     INITIALIZE                      KHJ-REC.
+     MOVE      PARA-JDATE       TO   KHJ-F01.
+     MOVE      PARA-JTIME       TO   KHJ-F02.
+     MOVE      387091           TO   KHJ-F03.
+     START     KHJOHOL1 KEY >=  KHJ-F01 KHJ-F02 KHJ-F03
+                                KHJ-F04 KHJ-F05 KHJ-F06
+                                KHJ-F07 KHJ-F08
+           INVALID   KEY
+               CONTINUE
+           NOT INVALID
+               READ  KHJOHOL1
+                  AT END
+                     CONTINUE
+                  NOT AT END
+                     IF ( PARA-JDATE = KHJ-F01 ) AND
+                        ( PARA-JTIME = KHJ-F02 ) AND
+                        ( KHJ-F03    = 387091  )
+                          DISPLAY    MSG-WARNING UPON CONS
+                          MOVE  9    TO END-FG
+                     END-IF
+               END-READ
+     END-START.
+*
+     CLOSE    KHJOHOL1.
+     OPEN     EXTEND   KHJOHOL1.
+*
+     READ     CVCSG001
+              AT END    MOVE      9         TO  END-FG
+              NOT AT END
+                        ADD       1         TO  RD-CNT
+     END-READ.
+*
+ INIT-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　メイン処理　　　　　　　　　　　　　　　　　　　*
+****************************************************************
+ MAIN-SEC     SECTION.
+*
+     MOVE    "MAIN-SEC"          TO   S-NAME.
+*伝票ヘッダ（１）処理
+     IF       DEN-01A  =     "B"
+              MOVE   DEN-REC     TO   WK-DEPA-REC
+     END-IF.
+*伝票ヘッダ（２）処理
+     IF        DEN-01A  =     "C"
+*             出荷場所件数マスタ出力
+              IF   CNT-MAISU     >    ZERO
+                   PERFORM  JHMKENL1-WRT-SEC
+              END-IF
+              MOVE      SPACE         TO    WK-DEPB-REC
+              INITIALIZE                    WK-DEPB-REC
+              MOVE      DEN-REC       TO    WK-DEPB-REC
+              ADD       1        TO   CNT-MAISU
+              MOVE      ZERO     TO   CNT-KENSU-D
+     END-IF.
+*伝票明細処理
+     IF       DEN-01A  =     "D"
+              MOVE      SPACE         TO    WK-DEPD-REC
+              INITIALIZE                    WK-DEPD-REC
+              MOVE      DEN-REC  TO   WK-DEPD-REC
+              ADD       1        TO   CNT-KENSU
+              ADD       1        TO   CNT-KENSU-D
+              PERFORM                 EDIT-SEC
+*2010/03/25 ADD
+              PERFORM                 KHJ-WRITE-SEC
+     END-IF.
+*
+     READ     CVCSG001
+              AT END    MOVE      9         TO  END-FG
+              NOT AT END
+                        ADD       1         TO  RD-CNT
+     END-READ.
+*
+ MAIN-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　ファイル出力　　　　　　　　　　　　　　　　　　*
+****************************************************************
+ EDIT-SEC              SECTION.
+*
+     MOVE    "EDIT-SEC"     TO        S-NAME.
+     MOVE     SPACE         TO        HEN-REC.
+     INITIALIZE                       HEN-REC.
+*各量販店領域転送
+*伝票ヘッダー（１）
+*    レコード区分（Ｂ）
+     MOVE     WK-DEPA01     TO        HEN-A01.
+*    帳票区分
+     MOVE     WK-DEPA02     TO        HEN-A02.
+*    伝票番号
+     MOVE     WK-DEPA03     TO        HEN-A031.
+*    Ｃ／Ｄ
+     MOVE     WK-DEPA04     TO        HEN-A032.
+*    会社ＣＤ
+     MOVE     WK-DEPA05     TO        HEN-A04.
+*    店ＣＤ
+     MOVE     WK-DEPA06     TO        HEN-A05.
+*    分類ＣＤ
+     MOVE     WK-DEPA07     TO        HEN-A06.
+*    伝票区分
+     MOVE     WK-DEPA08     TO        HEN-A07.
+*    取引先ＣＤ
+     MOVE     WK-DEPA09     TO        HEN-A08.
+*    発注日
+     MOVE     WK-DEPA10     TO        HEN-A09.
+*    納品日
+     MOVE     WK-DEPA11     TO        HEN-A10.
+*    便
+     MOVE     WK-DEPA12     TO        HEN-A11.
+*    社名
+     MOVE     WK-DEPA13     TO        HEN-A12.
+*    店名
+     MOVE     WK-DEPA14     TO        HEN-A13.
+*    取引先名（上段）
+     MOVE     WK-DEPA15     TO        HEN-A14.
+*    取引先名（中段）
+     MOVE     WK-DEPA16     TO        HEN-A15.
+*    発注区分  2010/03/27 ADD
+     MOVE     WK-DEPA17     TO        HEN-A16.
+*    出荷先区分  2010/03/27 ADD
+     MOVE     WK-DEPA18     TO        HEN-A161.
+*    緊急区分  2010/03/27 ADD
+     MOVE     WK-DEPA19     TO        HEN-A162.
+*    空白
+     MOVE     WK-DEPA20     TO        HEN-A163.
+*伝票ヘッダ（２）
+*    レコード区分
+     MOVE     WK-DEPB01     TO        HEN-A17.
+*    帳票区分
+     MOVE     WK-DEPB02     TO        HEN-A18.
+*    定番特売区分
+     MOVE     WK-DEPB03     TO        HEN-A19.
+*    摘要１（Ｄ欄上段）
+     MOVE     WK-DEPB04     TO        HEN-A201.
+*    摘要１（Ｄ欄中段）
+     MOVE     WK-DEPB05     TO        HEN-A202.
+*    摘要１（Ｄ欄下段）
+     MOVE     WK-DEPB06     TO        HEN-A203.
+*    摘要２（Ｅ欄中段）
+     MOVE     WK-DEPB07     TO        HEN-A21.
+*    摘要３（Ｆ欄）
+     MOVE     WK-DEPB08     TO        HEN-A22.
+*    摘要４（Ｈ欄）
+     MOVE     WK-DEPB09     TO        HEN-A23.
+*    配送区分
+     MOVE     WK-DEPB10     TO        HEN-A24.
+*    センターコード
+     MOVE     WK-DEPB11     TO        HEN-A25.
+*    空白
+     MOVE     WK-DEPB12     TO        HEN-A26.
+*伝票明細転送
+*    レコード区分
+     MOVE     WK-DEPD01     TO        HEN-A27.
+*    帳票区分
+     MOVE     WK-DEPD02     TO        HEN-A28.
+*    行番号
+     MOVE     WK-DEPD03     TO        HEN-A29.
+*    商品ＣＤ
+     MOVE     WK-DEPD04     TO        HEN-A30.
+*    予備
+     MOVE     WK-DEPD05     TO        HEN-A31.
+*    発注単位
+     MOVE     WK-DEPD06     TO        HEN-A32.
+*    発注数
+     MOVE     WK-DEPD07     TO        HEN-A33.
+*    予備
+     MOVE     WK-DEPD08     TO        HEN-A34.
+*    数量
+     MOVE     WK-DEPD09     TO        HEN-A35.
+*    予備
+     MOVE     WK-DEPD10     TO        HEN-A36.
+*    原価単価
+     MOVE     WK-DEPD11     TO        HEN-A37.
+*    売価単価
+     MOVE     WK-DEPD12     TO        HEN-A38.
+*    原価金額
+     MOVE     WK-DEPD13     TO        HEN-A39.
+*    売価金額
+     MOVE     WK-DEPD14     TO        HEN-A40.
+*    商品名上段
+     MOVE     WK-DEPD15     TO        HEN-A411.
+*    商品下段
+     MOVE     WK-DEPD16     TO        HEN-A412.
+*    ＪＡＮＣＤ
+     MOVE     WK-DEPD17     TO        HEN-A42.
+*    空白
+     MOVE     WK-DEPD18     TO        HEN-A43.
+*
+     PERFORM  TENSO-SEC.
+*
+     WRITE    HEN-REC.
+     ADD      1             TO   WRT-CNT1.
+*
+ EDIT-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　変換伝票転送                                    *
+****************************************************************
+ TENSO-SEC             SECTION.
+*
+     MOVE    "TENSO-SEC"   TO        S-NAME.
+*店コード
+     MOVE        HEN-A05   TO        HEN-F07.
+*店舗マスタ検索（３８７０９で検索する）
+*****DISPLAY "HEN-A08 = " HEN-A08  UPON CONS.
+*****DISPLAY "HEN-F07 = " HEN-F07  UPON CONS.
+     MOVE        HEN-A08   TO        TEN-F52.
+     MOVE        HEN-F07   TO        TEN-F011.
+     PERFORM     HTENMS-READ-SEC.
+*****DISPLAY "HTENMS-INV-FLG = " HTENMS-INV-FLG UPON CONS.
+     IF          HTENMS-INV-FLG = SPACE
+                 IF  TEN-F73      =  "T9"
+                     MOVE 387091  TO  WK-TOKCD2 WK-TOKCD3
+                     MOVE "1"     TO  WK-TOKCD-CHK2
+                     ADD   1      TO  WK-DEN-KENSU2
+                 ELSE
+                     MOVE 38709   TO  WK-TOKCD1 WK-TOKCD3
+                     MOVE "1"     TO  WK-TOKCD-CHK1
+                     ADD   1      TO  WK-DEN-KENSU1
+                 END-IF
+     ELSE
+                 MOVE 38709       TO  WK-TOKCD1 WK-TOKCD3
+                 MOVE "1"         TO  WK-TOKCD-CHK1
+                 ADD   1          TO  WK-DEN-KENSU1
+     END-IF.
+*取引先コード
+*****MOVE        HEN-A08   TO        HEN-F01  WK-TOKCD.
+     MOVE        WK-TOKCD3 TO        HEN-F01  WK-TOKCD.
+*伝票ナンバー
+     MOVE        HEN-A031  TO        HEN-F02  HEN-F23.
+     IF          WK-HEN-F02  NOT =  HEN-F02
+                 IF  WK-TOKCD = 38709
+                     ADD   1         TO       WK-DEN-MAISU1
+                 END-IF
+                 IF  WK-TOKCD = 387091
+                     ADD   1         TO       WK-DEN-MAISU2
+                 END-IF
+                 MOVE   HEN-F02      TO       WK-HEN-F02
+     END-IF.
+*行■
+     MOVE        HEN-A29   TO        HEN-F03.
+*伝区
+     MOVE        40        TO        HEN-F051.
+     MOVE     NC"売上伝票" TO        HEN-F052.
+*担当者コード
+     MOVE        99        TO        HEN-F06.
+*店コード
+     MOVE        HEN-A05   TO        HEN-F07.
+*  商品変換テーブル検索
+     MOVE        SPACE     TO        TBL-REC.
+     INITIALIZE                      TBL-REC.
+     MOVE        HEN-F01   TO        TBL-F01.
+     MOVE        HEN-A30   TO        TBL-F02.
+     READ    SHOTBL1
+       INVALID
+         MOVE    SPACE     TO        TBL-REC
+         INITIALIZE                  TBL-REC
+     END-READ.
+*出荷場所／伝発場所
+     MOVE        TBL-F04   TO        HEN-F08
+                                     HEN-F09.
+*発注日  (年を条件ファイルの置換値とプラスして西暦４桁にする）
+*****COMPUTE     HEN-F111  = WK-NEN * 10000 + HEN-A07.
+     MOVE       "3"        TO        LINK-IN-KBN.
+     MOVE        HEN-A09   TO        LINK-IN-YMD6.
+     CALL       "SKYDTCKB"   USING   LINK-IN-KBN
+                                     LINK-IN-YMD6
+                                     LINK-IN-YMD8
+                                     LINK-OUT-RET
+                                     LINK-OUT-YMD8.
+     IF          LINK-OUT-RET   =    ZERO
+         MOVE    LINK-OUT-YMD8  TO   HEN-F111  WK-KHJ-HACBI
+     ELSE
+         MOVE    ZERO           TO   HEN-F111  WK-KHJ-HACBI
+     END-IF.
+*納品日  (年を条件ファイルの置換値とプラスして西暦４桁にする）
+*****COMPUTE     HEN-F112  = WK-NEN * 10000 + HEN-A08.
+     MOVE       "3"        TO        LINK-IN-KBN.
+     MOVE        HEN-A10   TO        LINK-IN-YMD6.
+     CALL       "SKYDTCKB"   USING   LINK-IN-KBN
+                                     LINK-IN-YMD6
+                                     LINK-IN-YMD8
+                                     LINK-OUT-RET
+                                     LINK-OUT-YMD8.
+     IF          LINK-OUT-RET   =    ZERO
+         MOVE    LINK-OUT-YMD8  TO   HEN-F112  WK-KHJ-NOUBI
+     ELSE
+         MOVE    ZERO           TO   HEN-F112  WK-KHJ-NOUBI
+     END-IF.
+*****MOVE        HEN-F112  TO        HEN-F113.
+*分類（部門）
+     MOVE        HEN-A06   TO        HEN-F12.
+*商品区分　　
+     MOVE        SPACE     TO        HEN-F131.
+*伝票区分　　
+     MOVE        HEN-A07   TO        HEN-F132.
+*伝発区分
+     MOVE        9         TO        HEN-F134.
+*自社商品コード
+     MOVE        TBL-F031  TO        HEN-F1411.
+*自社商品単品コード
+     MOVE        TBL-F032  TO        HEN-F1412.
+*商品名　　　
+*    商品名称マスタ検索
+     MOVE        SPACE     TO        MEI-REC.
+     INITIALIZE                      MEI-REC.
+     MOVE        TBL-F031  TO        MEI-F011.
+     MOVE        TBL-F032  TO        MEI-F012.
+     READ    MEIMS1
+       INVALID
+*        商品名
+         MOVE    HEN-A411(1:15) TO   HEN-F1421
+         MOVE    HEN-A411(16:5) TO   HEN-F1422(1:5)
+         MOVE    HEN-A411(21:5) TO   HEN-F1422(6:10)
+         MOVE    HEN-A412(1:15) TO   HEN-F1422(11:5)
+       NOT INVALID
+         MOVE    HEN-A411(1:15) TO   HEN-F1421
+         MOVE    HEN-A411(16:5) TO   HEN-F1422(1:5)
+         MOVE    HEN-A411(21:5) TO   HEN-F1422(6:10)
+         MOVE    HEN-A412(1:15) TO   HEN-F1422(11:5)
+     END-READ.
+*数量
+     MOVE        HEN-A35   TO        HEN-F15.
+*単
+     MOVE       "1"        TO        HEN-F16.
+*原価単価
+     MOVE        HEN-A37   TO        HEN-F172.
+*売価単価
+     MOVE        HEN-A38   TO        HEN-F173.
+*原価金額
+     MOVE        HEN-A39   TO        HEN-F181.
+*売価金額
+     MOVE        HEN-A40   TO        HEN-F182.
+*店舗名（備考）
+*****MOVE        HEN-A16   TO        HEN-F22.
+*自社得意先コード
+*****IF  FLG-TOK   =    ZERO
+*    得意先マスタ検索
+         MOVE    SPACE         TO    TOK-REC
+         INITIALIZE                  TOK-REC
+         MOVE    WK-TOKCD      TO    TOK-F01
+         READ    TOKMS2
+             INVALID
+               MOVE  SPACE     TO    TOK-REC
+               INITIALIZE            TOK-REC
+         END-READ
+         MOVE    TOK-F52   TO        HEN-F24
+*********MOVE    1         TO        FLG-TOK
+*****ELSE
+*****    MOVE    TOK-F52   TO        HEN-F24
+*****END-IF.
+*相手商品コード
+     MOVE        HEN-A30   TO        HEN-F25.
+*伝票発行区分
+     MOVE        9         TO        HEN-F272.
+*オンライン区分
+     MOVE        1         TO        HEN-F274.
+*エントリー区分
+     MOVE        1         TO        HEN-F275.
+*付番区分
+     MOVE        9         TO        HEN-F276.
+*量販店区分
+     MOVE       "A"        TO        HEN-F278.
+*ＷＳ■
+     MOVE        1         TO        HEN-F28.
+*変換値
+*****MOVE        WK-NEN    TO        HEN-F29.
+*店舗名（カナ）
+     MOVE        HEN-A13   TO        HEN-F30.
+*システム日付
+     MOVE        SYS-DATEW TO        HEN-F99.
+*ルート（直送区分）
+*****MOVE        HEN-A24   TO        HEN-F42.
+     MOVE        HEN-A161  TO        HEN-F42.
+*受信日付
+     MOVE     PARA-JDATE   TO        HEN-F46.
+*受信時刻
+     MOVE     PARA-JTIME   TO        HEN-F47.
+*振分倉庫コード
+*    ルート条件マスタ検索
+     MOVE     ZERO         TO        INV-RUT.
+     MOVE     SPACE        TO        RUT-REC.
+     INITIALIZE                      RUT-REC.
+*取引先ＣＤは取引先エリアの取引先ＣＤを使用すること
+*****MOVE     HEN-F01      TO        RUT-F01.
+     MOVE     HEN-F01      TO        RUT-F01.
+     MOVE     SPACE        TO        RUT-F02.
+*****MOVE     HEN-A24      TO        RUT-F03.
+     MOVE     HEN-A161     TO        RUT-F03.
+     READ     JHMRUTL1
+         INVALID
+           MOVE  1         TO        INV-RUT
+           MOVE  TOK-F81   TO        HEN-F48  WK-KHJ-SOKO
+         NOT INVALID
+           MOVE  RUT-F05   TO        HEN-F48  WK-KHJ-SOKO
+     END-READ.
+*振分倉庫ＣＤ判定
+*****DISPLAY "TEN-F73 = " TEN-F73  UPON CONS.
+*****IF    HTENMS-INV-FLG = SPACE
+*****AND   TEN-F73  NOT =   SPACE
+***********DISPLAY "AAAAA" UPON CONS
+***********MOVE  TEN-F73   TO        HEN-F48  HEN-F08  HEN-F09
+*****END-IF.
+*ルート（トステムビバは、振分倉庫ＣＤをセット）
+     MOVE        HEN-F48   TO        HEN-F42.
+*_番
+     MOVE        TBL-F08   TO        HEN-F49.
+*訂正前数量
+     MOVE        HEN-A35   TO        HEN-F50.
+*修正原価単価
+     MOVE        HEN-A37   TO        HEN-F512.
+*修正売価単価
+     MOVE        HEN-A38   TO        HEN-F513.
+*修正原価金額
+     MOVE        HEN-A39   TO        HEN-F521.
+*修正売価金額
+     MOVE        HEN-A40   TO        HEN-F522.
+*
+ TENSO-EXIT.
+     EXIT.
+****************************************************************
+*              基本情報ファイル出力 2010/03/25 ADD             *
+****************************************************************
+ KHJ-WRITE-SEC           SECTION.
+*
+     MOVE     SPACE        TO        KHJ-REC.
+     INITIALIZE                      KHJ-REC.
+*共通部
+*  バッチ日付
+     MOVE     PARA-JDATE   TO        KHJ-F01.
+*　バッチ時間
+     MOVE     PARA-JTIME   TO        KHJ-F02.
+*　バッチ取引先
+     MOVE     WK-TOKCD3    TO        KHJ-F03.
+*　倉庫CD
+     MOVE     WK-KHJ-SOKO  TO        KHJ-F04.
+*  店舗CD
+     MOVE     WK-DEPA06    TO        KHJ-F05.
+*  伝票番号
+     MOVE     WK-DEPA03    TO        KHJ-F06.
+*　行番号
+     MOVE     WK-DEPD03    TO        KHJ-F07.
+*　納品日
+     MOVE     WK-KHJ-NOUBI TO        KHJ-F08.
+*　分類CD
+     MOVE     WK-DEPA07    TO        KHJ-F13.
+*  伝票区分
+     MOVE     WK-DEPA08    TO        KHJ-F14.
+*　発生日
+     MOVE     WK-KHJ-HACBI TO        KHJ-F15.
+*　納品日
+     MOVE     WK-KHJ-NOUBI TO        KHJ-F16.
+*伝票ヘッダ
+     MOVE     WK-DEPA-REC  TO        KHJ-HED.
+*伝票ヘッダ２
+     MOVE     WK-DEPB-REC  TO        KHJ-HME.
+*明細
+     MOVE     WK-DEPD-REC  TO        KHJ-MEI.
+*
+     WRITE    KHJ-REC.
+     ADD      1             TO   WRT-CNT2.
+*
+ KJH-WRITE-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　出荷場所件数マスタ出力                          *
+****************************************************************
+ JHMKENL1-WRT-SEC        SECTION.
+*
+     MOVE   "JHMKENL1-WRT-SEC"  TO   S-NAME.
+     MOVE    SPACE         TO        KEN-REC.
+     INITIALIZE                      KEN-REC.
+     MOVE    PARA-JDATE    TO        KEN-F01.
+     MOVE    PARA-JTIME    TO        KEN-F02.
+     MOVE    WK-TOKCD      TO        KEN-F03.
+     IF      INV-RUT       =         ZERO
+             MOVE  RUT-F05     TO    KEN-F04
+     ELSE
+             MOVE  TOK-F81     TO    KEN-F04
+     END-IF.
+*****MOVE    HEN-F48       TO        KEN-F04.
+     READ    JHMKENL1
+       INVALID
+         CONTINUE
+       NOT INVALID
+         GO  TO   JHMKENL1-010
+     END-READ.
+*
+     MOVE    SPACE         TO        KEN-REC.
+     INITIALIZE                      KEN-REC.
+     MOVE    PARA-JDATE    TO        KEN-F01.
+     MOVE    PARA-JTIME    TO        KEN-F02.
+     MOVE    WK-TOKCD      TO        KEN-F03.
+     IF      INV-RUT       =         ZERO
+             MOVE  RUT-F05     TO    KEN-F04
+     ELSE
+             MOVE  TOK-F81     TO    KEN-F04
+     END-IF.
+*****MOVE    HEN-F48       TO        KEN-F04.
+     MOVE    PARA-KSYU     TO        KEN-F05.
+     MOVE    PARA-YUSEN    TO        KEN-F06.
+     MOVE    CNT-KENSU-D   TO        KEN-F10.
+     MOVE    1             TO        KEN-F11.
+     WRITE   KEN-REC.
+     GO      TO   JHMKENL1-WRT-EXIT.
+*
+ JHMKENL1-010.
+*
+     MOVE    PARA-KSYU     TO        KEN-F05.
+     MOVE    PARA-YUSEN    TO        KEN-F06.
+     ADD     CNT-KENSU-D   TO        KEN-F10.
+     ADD     1             TO        KEN-F11.
+     REWRITE KEN-REC.
+*
+ JHMKENL1-WRT-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　終了処理　　　　　　　　　　　　　　　　　　　　*
+****************************************************************
+ END-SEC       SECTION.
+*
+     MOVE     "END-SEC"  TO      S-NAME.
+     IF        CNT-MAISU     >    ZERO
+*              出荷場所件数マスタ出力
+               PERFORM   JHMKENL1-WRT-SEC
+*              当日スケジュールマスタ出力
+               IF   WK-TOKCD-CHK1  =  "1"
+                    PERFORM   JHMTJSL1-WRT-SEC
+               END-IF
+*              当日スケジュールマスタ出力
+               IF   WK-TOKCD-CHK2  =  "1"
+                    PERFORM   JHMTJSL2-WRT-SEC
+               END-IF
+     END-IF.
+*
+     MOVE      RD-CNT    TO      IN-CNT.
+     MOVE      WRT-CNT1   TO      OUT-CNT1.
+     MOVE      WRT-CNT2   TO      OUT-CNT2.
+     DISPLAY   MSG-IN    UPON CONS.
+     DISPLAY   MSG-OUT1  UPON CONS.
+     DISPLAY   MSG-OUT2  UPON CONS.
+     DISPLAY   MSG-END   UPON CONS.
+*
+     CLOSE     CVCSG001  JHSHENL1  KHJOHOL1
+               SHOTBL1   MEIMS1
+               JHMRUTL1  TOKMS2
+               JHMKENL1  JHMTJSL1.
+*    ＶＬＤＦ出力処理
+     IF        CNT-MAISU     >    ZERO
+               PERFORM   VLD500-OUTPUT-SEC
+     END-IF.
+     CLOSE     VLD500.
+*
+     STOP      RUN.
+*
+ END-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　当日スケジュールマスタ出力　　　　　　　　　　　*
+****************************************************************
+ JHMTJSL1-WRT-SEC        SECTION.
+*
+     MOVE   "JHMTJSL1-WRT-SEC"  TO   S-NAME.
+     MOVE    SPACE         TO        TJS-REC.
+     INITIALIZE                      TJS-REC.
+     MOVE    PARA-JDATE    TO        TJS-F01.
+     MOVE    PARA-JTIME    TO        TJS-F02.
+     MOVE    WK-TOKCD1     TO        TJS-F03.
+     READ    JHMTJSL1
+       INVALID
+         CONTINUE
+       NOT INVALID
+         GO  TO   JHMTJSL1-010
+     END-READ.
+*
+     MOVE    SPACE         TO        TJS-REC.
+     INITIALIZE                      TJS-REC.
+     MOVE    PARA-JDATE    TO        TJS-F01.
+     MOVE    PARA-JTIME    TO        TJS-F02.
+     MOVE    WK-TOKCD1     TO        TJS-F03.
+     MOVE    WK-DEN-KENSU1 TO        TJS-F08.
+     MOVE    WK-DEN-MAISU1 TO        TJS-F09.
+     WRITE   TJS-REC.
+     GO      TO    JHMTJSL1-WRT-EXIT.
+*
+ JHMTJSL1-010.
+*
+     MOVE    WK-DEN-KENSU1 TO        TJS-F08.
+     MOVE    WK-DEN-MAISU1 TO        TJS-F09.
+     REWRITE TJS-REC.
+*
+ JHMTJSL1-WRT-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　当日スケジュールマスタ出力　　　　　　　　　　　*
+****************************************************************
+ JHMTJSL2-WRT-SEC        SECTION.
+*
+     MOVE   "JHMTJSL2-WRT-SEC"  TO   S-NAME.
+     MOVE    SPACE         TO        TJS-REC.
+     INITIALIZE                      TJS-REC.
+     MOVE    PARA-JDATE    TO        TJS-F01.
+     MOVE    PARA-JTIME    TO        TJS-F02.
+     MOVE    WK-TOKCD2     TO        TJS-F03.
+     READ    JHMTJSL1
+       INVALID
+         CONTINUE
+       NOT INVALID
+         GO  TO   JHMTJSL2-010
+     END-READ.
+*
+     MOVE    SPACE         TO        TJS-REC.
+     INITIALIZE                      TJS-REC.
+     MOVE    PARA-JDATE    TO        TJS-F01.
+     MOVE    PARA-JTIME    TO        TJS-F02.
+     MOVE    WK-TOKCD2     TO        TJS-F03.
+     MOVE    WK-DEN-KENSU2 TO        TJS-F08.
+     MOVE    WK-DEN-MAISU2 TO        TJS-F09.
+     WRITE   TJS-REC.
+     GO      TO    JHMTJSL2-WRT-EXIT.
+*
+ JHMTJSL2-010.
+*
+     MOVE    WK-DEN-KENSU2 TO        TJS-F08.
+     MOVE    WK-DEN-MAISU2 TO        TJS-F09.
+     REWRITE TJS-REC.
+*
+ JHMTJSL2-WRT-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　ＶＬＤ５００出力処理                            *
+****************************************************************
+ VLD500-OUTPUT-SEC       SECTION.
+*
+     IF WK-TOKCD-CHK1 = "1"
+        MOVE   "VLD500-OUTPUT-SEC"   TO    S-NAME
+        MOVE      SPACE              TO    VLD-REC
+        INITIALIZE                         VLD-REC
+        MOVE      500                TO    VLD-F02
+        MOVE      "NW"               TO    VLD-F03
+        MOVE      52                 TO    VLD-F10
+        MOVE      PARA-JDATE         TO    VLD-F11
+        MOVE      PARA-JTIME         TO    VLD-F12
+        MOVE      WK-TOKCD1          TO    VLD-F13
+        DISPLAY "PARA-JDATE = " PARA-JDATE UPON CONS
+        DISPLAY "PARA-JTIME = " PARA-JTIME UPON CONS
+        DISPLAY "WK-TOKCD   = " WK-TOKCD   UPON CONS
+        WRITE     VLD-REC
+     END-IF.
+*
+     IF WK-TOKCD-CHK2 = "1"
+        MOVE   "VLD500-OUTPUT-SEC"   TO    S-NAME
+        MOVE      SPACE              TO    VLD-REC
+        INITIALIZE                         VLD-REC
+        MOVE      500                TO    VLD-F02
+        MOVE      "NW"               TO    VLD-F03
+        MOVE      52                 TO    VLD-F10
+        MOVE      PARA-JDATE         TO    VLD-F11
+        MOVE      PARA-JTIME         TO    VLD-F12
+        MOVE      WK-TOKCD2          TO    VLD-F13
+        DISPLAY "PARA-JDATE = " PARA-JDATE UPON CONS
+        DISPLAY "PARA-JTIME = " PARA-JTIME UPON CONS
+        DISPLAY "WK-TOKCD   = " WK-TOKCD   UPON CONS
+        WRITE     VLD-REC
+     END-IF.
+*
+ VLD500-OUTPUT-EXIT.
+     EXIT.
+****************************************************************
+*　　　　　　　店舗マスタ検索
+****************************************************************
+ HTENMS-READ-SEC         SECTION.
+*
+     MOVE   "HTENMS-READ-SEC"     TO    S-NAME.
+*
+     READ    HTENMS
+             INVALID      MOVE  "INV"   TO   HTENMS-INV-FLG
+             NOT  INVALID MOVE  SPACE   TO   HTENMS-INV-FLG
+     END-READ.
+*
+ HTENMS-READ-EXIT.
+     EXIT.
+*-------------< PROGRAM END >------------------------------------*
+

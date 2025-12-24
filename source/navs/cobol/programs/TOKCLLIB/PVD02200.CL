@@ -1,0 +1,115 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　新基幹システム                        *  ./
+/. *   SYSTEM-NAME :    入荷管理                             *  ./
+/. *   JOB-ID      :    PVD02200                             *  ./
+/. *   JOB-NAME    :    入荷実績リスト　                     *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PVD02200'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?SOKO     ,STRING*2
+    VAR       ?DSOKO    ,STRING*2
+    VAR       ?WKSTN    ,STRING*8
+    VAR       ?NWKSTN   ,NAME
+    ?NWKSTN    :=       @ORGWS
+    ?WKSTN    :=        %STRING(?NWKSTN)
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DEFLIBL    D365DLIB/TOKELIB/TOKFLIB/TOKELIBO/TOKSOLIB
+
+    CRTFILE FILE-NYKJISF.D365DLIB,ORG-@SF,BF-6,USED-@YES,
+            RL-200,RECN-1000,ERECN-1000
+
+/.  倉庫ＣＤ取得                                                ./
+SKY1601B:
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WKSTN,?SOKO,?DSOKO)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+
+/.  入荷実績リスト抽出                                          ./
+NVD0220I:
+    ?STEP :=   'NVD0220I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    OVRF      FILE-NYKFILL2,TOFILE-NYKFILL2.D365DLIB
+    OVRF      FILE-HACHEDL1,TOFILE-HACHEDL1.D365DLIB
+    OVRF      FILE-HACMEIL1,TOFILE-HACMEIL1.D365DLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-NYJISEKF,TOFILE-NYKJISF.D365DLIB
+    CALL      PGM-NVD0220I.TOKSOLIB,PARA-(?SOKO,?DSOKO)
+    IF        @PGMEC     =   4050 THEN
+              GOTO RTN   END
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.  ＳＯＲＴ                                                    ./
+SORT01:
+    ?STEP :=   'SORT'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    SORT       INFILE-NYKJISF.D365DLIB,INRL-200,INBF-6,
+               OUTFILE-NYKJISF.D365DLIB,OUTBF-6,RCD-4,
+               KEY-1!17!CA,KEY1-20!2!CA,KEY2-18!2!CA,KEY3-22!8!CA,
+               RCDL-@DSP
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.  実績予定リスト出力                                          ./
+NVD0230L:
+    ?STEP :=   'ZNY0060L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-NYJISEKF,TOFILE-NYKJISF.D365DLIB
+    OVRF      FILE-ZSHIMS1,TOFILE-ZSHIMS1.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    CALL      PGM-NVD0230L.TOKSOLIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DLTFILE   NYKJISF.D365DLIB
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    DLTFILE   NYKJISF.D365DLIB
+    RETURN    PGMEC-@PGMEC
+

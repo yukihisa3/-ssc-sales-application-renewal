@@ -1,0 +1,177 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    業務改善（出荷改善）                 *  ./
+/. *   JOB-ID      :    PKZ00500                             *  ./
+/. *   JOB-NAME    :    出荷依頼リスト発行                   *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PKZ00500'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '     /.部門CD./
+    VAR       ?TANTO    ,STRING*2,VALUE-'  '       /.担当者CD./
+    VAR       ?SOKCD    ,STRING*2,VALUE-'  '       /.倉庫./
+    VAR       ?SOKCD1   ,STRING*2,VALUE-'  '       /.倉庫./
+    VAR       ?DSOKCD   ,STRING*2,VALUE-'  '       /.代表倉庫./
+    VAR       ?SNOUDT   ,STRING*8,VALUE-'        ' /.納品日開始./
+    VAR       ?ENOUDT   ,STRING*8,VALUE-'        ' /.納品日終了./
+    VAR       ?SSAKUSEI ,STRING*8,VALUE-'        ' /.作成日開始./
+    VAR       ?ESAKUSEI ,STRING*8,VALUE-'        ' /.作成日終了./
+    VAR       ?TORICD   ,STRING*8,VALUE-'        ' /.取引先CD./
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '       /.担当者CD./
+    VAR       ?DTKBN    ,STRING*1,VALUE-' '        /.ＤＴ区分./
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO/TOKFLIBO
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##部門ｺｰﾄﾞ担当者ｺｰﾄﾞ取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANTO)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?SOKCD,?DSOKCD)
+    IF        @PGMEC    ^=   0   THEN
+              GOTO ABEND
+    END
+    ?SOKCD1 :=  ?SOKCD
+
+/.##出荷依頼リスト発行指示##./
+SKZ0050I:
+
+    ?STEP :=   'SKZ0050I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-SKZ0050I.TOKELIBO,PARA-(?BUMON,?SOKCD,?DSOKCD,
+              ?SNOUDT,?ENOUDT,?SSAKUSEI,?ESAKUSEI,?TORICD,?TANCD,
+              ?DTKBN)
+    IF        @PGMEC    ^=   0  THEN
+              IF  @PGMEC = 4010  THEN
+                  SNDMSG MSG-'##取消終了##',TO-XCTL
+                  RETURN
+              ELSE
+                  GOTO  ABEND
+              END
+    END
+
+/.##出荷依頼リスト##./
+SKZ0055L:
+
+    ?STEP :=   'SKZ0055L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.  OVRPRTF   FILE-PRTF,TOFILE-PRTF.XUCL,MEDLIB-TOKELIBO
+    OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+./  ?MSGX :=  '##出力倉庫CD = ' && ?SOKCD1 && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF   ?SOKCD1 = '01'  THEN   /.##本社##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XOUTQ1
+    END
+    IF   ?SOKCD1 = '6A'  THEN   /.##片岡##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPSKRQL
+    END
+    IF   ?SOKCD1 = '63'  THEN   /.##フバサミ##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPFUBQL
+    END
+    IF   ?SOKCD1 = 'T5'  THEN   /.##カトーレック##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPKARQL
+    END
+    IF   ?SOKCD1 = '6M'  THEN   /.##富岡##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPXLX83
+    END
+    IF   ?SOKCD1 = '84'  THEN   /.##鴻巣##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPKOUQL
+    END
+    IF   ?SOKCD1 = '90'  THEN   /.##手綱##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPTEZQL
+    END
+    IF   ?SOKCD1 = '86'  THEN   /.##西尾##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPNISQL
+    END
+    IF   ?SOKCD1 = 'S4'  THEN   /.##花の海##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPHANQL
+    END
+    IF   ?SOKCD1 = 'E2'  THEN   /.##北上##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPHITQL
+    END
+    IF   ?SOKCD1 = '53'  THEN   /.##岡山物流##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPOKSQL
+    END
+    IF   ?SOKCD1 = 'T9'  THEN   /.##蔦井##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPTUTQL
+    END
+    IF   ?SOKCD1 = 'E1'  THEN   /.##甘木##./
+         OVRPRTF FILE-XU04LP,TOFILE-LBPPRTF.XUCL,OUTQ-XXPAMGQL
+    END
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-SKZ0055L.TOKELIBO,PARA-(?BUMON,?SOKCD,?DSOKCD,
+              ?SNOUDT,?ENOUDT,?SSAKUSEI,?ESAKUSEI,?TORICD,?TANCD,
+              ?DTKBN)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

@@ -1,0 +1,322 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　出荷検品システム（本社システム）      *  ./
+/. *   SYSTEM-NAME :    出荷検品システム（ケーヨー以外）　　 *  ./
+/. *   JOB-ID      :    PKE51200                             *  ./
+/. *   JOB-NAME    :    受信データ更新／累積処理             *  ./
+/. ***********************************************************  ./
+    PGM
+
+    VAR   ?WS    ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR   ?WKSTN ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR   ?PGMEC ,INTEGER
+    VAR   ?PGMECX,STRING*11
+    VAR   ?PGMEM ,STRING*99
+    VAR   ?MSG   ,STRING*99(6)
+    VAR   ?MSGX  ,STRING*99
+    VAR   ?PGMID ,STRING*8,VALUE-'PKE51200'
+    VAR   ?STEP  ,STRING*8
+    VAR   ?P1    ,STRING*6,VALUE-'000000'   /.検品明細Ｆ./
+    VAR   ?P2    ,STRING*6,VALUE-'000000'   /.累積検品明細Ｆ./
+    VAR   ?P3    ,STRING*6,VALUE-'000000'   /.出荷ﾗﾍﾞﾙﾍｯﾀﾞＦ./
+    VAR   ?P4    ,STRING*6,VALUE-'000000'   /.累積出荷ﾗﾍﾞﾙﾍｯﾀﾞＦ./
+    VAR   ?P5    ,STRING*6,VALUE-'000000'   /.出荷ﾗﾍﾞﾙ明細Ｆ./
+    VAR   ?P6    ,STRING*6,VALUE-'000000'   /.累積出荷ﾗﾍﾞﾙ明細Ｆ./
+    VAR   ?P7    ,STRING*2,VALUE-'00'       /.代表倉庫./
+    VAR   ?P8    ,STRING*2,VALUE-'00'       /.制御倉庫./
+    VAR   ?FILNM ,STRING*8,VALUE-'        ' /.ﾌｧｲﾙ名合併用./
+    VAR   ?FILNMS,STRING*6,VALUE-'RCVDAT'   /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR   ?FILNME,STRING*6,VALUE-'RCVEDT'   /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR   ?LIBNM ,STRING*8,VALUE-'TOKWLIB ' /.ﾗｲﾌﾞﾗﾘ名ﾃﾞﾌｫﾙﾄ./
+    VAR   ?LIBNMB,STRING*8,VALUE-'TOKBLIB ' /.ﾗｲﾌﾞﾗﾘ名ﾃﾞﾌｫﾙﾄBACKUP./
+    VAR   ?FILID ,NAME                      /.ﾌｧｲﾙ名名前型./
+    VAR   ?LIBID ,NAME                      /.ﾗｲﾌﾞﾗﾘ名名前型./
+    VAR   ?RCVSYUF ,NAME!MOD                /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR   ?RCVSYUFN,STRING*17               /.ﾌｧｲﾙ名表示用./
+    VAR   ?RCVFUTF ,NAME!MOD                /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR   ?RCVFUTFN,STRING*17               /.ﾌｧｲﾙ名表示用./
+    VAR   ?RCVKONF ,NAME!MOD                /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR   ?RCVKONFN,STRING*17               /.ﾌｧｲﾙ名表示用./
+    VAR   ?RCVERRF ,NAME!MOD                /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR   ?RCVERRFN,STRING*17               /.ﾌｧｲﾙ名表示用./
+    VAR   ?RCVSYUFB,NAME!MOD                /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR   ?RCVFUTFB,NAME!MOD                /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR   ?RCVKONFB,NAME!MOD                /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR   ?SYJOHOF ,STRING*6,VALUE-'000000'
+    VAR   ?RCVERRF1,STRING*6,VALUE-'000000'
+    VAR   ?PDATE   ,STRING*8,VALUE-'00000000'
+    VAR   ?PTIME   ,STRING*4,VALUE-'0000'
+    VAR   ?SKEKA   ,STRING*1,VALUE-'0'
+    VAR   ?PGNM    ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR   ?KEKA1   ,STRING*40                  /.      2    ./
+    VAR   ?KEKA2   ,STRING*40                  /.      3    ./
+    VAR   ?KEKA3   ,STRING*40                  /.      4    ./
+    VAR   ?KEKA4   ,STRING*40                  /.      5    ./
+    VAR   ?OPR1    ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR   ?OPR2    ,STRING*50                  /.      2    ./
+    VAR   ?OPR3    ,STRING*50                  /.      3    ./
+    VAR   ?OPR4    ,STRING*50                  /.      4    ./
+    VAR   ?OPR5    ,STRING*50                  /.      5    ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '出荷検品－検品済ＤＴ更新（ケーヨー以外）'
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB/TOKKLIB
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.#################################################################./
+/.##資源の事前獲得（下記ファイル使用時、メッセージ表示）         ##./
+/.#################################################################./
+FILECHK:
+    ASSIGN FILE-RCVDATF.TOKKLIB!@XCL    /.##出荷検品情報ﾌｧｲﾙ##./
+    IF     @PGMEC  ^=    0    THEN
+           ?OPR1  :=  '＜他倉庫使用中＞'
+           ?OPR2  :=  '現在、他倉庫にて検品取込処理中です。'
+           ?OPR3  :=  'もう暫く時間をおいてから再度実行して下さい。'
+           ?OPR4  :=  ''
+           ?OPR5  :=  ''
+           CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+           RETURN
+    END
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?P7,?P8)
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '【倉庫ＣＤ取得】'
+              GOTO ABEND
+    END
+
+/.##倉庫ｺｰﾄﾞ選択##./
+SKY1701I:
+
+    ?STEP :=   'SKY1701I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    CALL      PGM-SKY1702I.TOKELIB,PARA-(?P7,?P8)
+    IF        @PGMEC    ^=   0    THEN
+              ?PGMEC := @PGMEC
+              IF    ?PGMEC  =  4010
+                 THEN
+                    ?MSGX := '##取消終了##'
+                    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+                    RETURN PGMEC-@PGMEC
+                 ELSE
+                    ?KEKA4 :=  '【倉庫ＣＤ入力】'
+                    GOTO   ABEND
+                 END
+    END
+
+/.##ﾌｧｲﾙ名称取得##./
+FILNMCHG:
+
+    ?MSGX := '## 実行倉庫ｺｰﾄﾞ = ' && ?P7 && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?FILNMS && ?P7        /.ﾃﾞﾌｫﾙﾄﾌｧｲﾙ名+倉庫CD./
+    ?FILID    :=    %NAME(?FILNM)         /.ﾌｧｲﾙ名名前型変換   ./
+    ?LIBID    :=    %NAME(?LIBNM)         /.ﾗｲﾌﾞﾗﾘ名名前型変換 ./
+    ?RCVSYUF  :=    %NCAT(?FILID,?LIBID)  /.ﾌｧｲﾙ名.ﾗｲﾌﾞﾗﾘ名    ./
+    ?LIBID    :=    %NAME(?LIBNMB)        /.ﾗｲﾌﾞﾗﾘ名名前型変換 ./
+    ?RCVSYUFB :=    %NCAT(?FILID,?LIBID)  /.ﾌｧｲﾙ名.ﾗｲﾌﾞﾗﾘ名    ./
+    ?RCVSYUFN :=    %STRING(?RCVSYUF)
+    ?MSGX     :=    '## 検品GF名 = ' && ?RCVSYUFN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    ?FILNM    :=    ?FILNME && ?P7        /.ﾃﾞﾌｫﾙﾄﾌｧｲﾙ名+倉庫CD./
+    ?FILID    :=    %NAME(?FILNM)         /.ﾌｧｲﾙ名名前型変換   ./
+    ?LIBID    :=    %NAME(?LIBNM)         /.ﾗｲﾌﾞﾗﾘ名名前型変換 ./
+    ?RCVERRF  :=    %NCAT(?FILID,?LIBID)  /.ﾌｧｲﾙ名.ﾗｲﾌﾞﾗﾘ名    ./
+    ?RCVERRFN :=    %STRING(?RCVERRF)
+    ?MSGX     :=    '## ｴﾗｰF名   = ' && ?RCVERRFN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##ファイルバックアップ##./
+PBACKUP1:
+
+    ?STEP :=   'PBACKUP1'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CNVFILE FILE-?RCVSYUF,TOFILE-?RCVSYUFB,
+            ADD-@NO,BF-34
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '【検品Ｆバックアップ】'
+              GOTO ABEND
+    END
+
+/.##検品明細更新累積##./
+SKE5120B:
+
+    ?STEP :=   'SKE5120B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-RCVSYUF,TOFILE-?RCVSYUF
+    OVRF      FILE-RUISYUF,TOFILE-RCVDATL1.TOKKLIB
+    OVRF      FILE-ZAMZAIL1,TOFILE-ZAMZAIL1.TOKFLIB
+    OVRF      FILE-SHTDENL1,TOFILE-SHTDENL1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF      FILE-RCVERRF,TOFILE-?RCVERRF
+    CALL      PGM-SKE5120B.TOKELIBO,PARA-(?P1,?P2,?P7)
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '【出荷検品ＤＴ更新】'
+              ?SKEKA := '2'
+              GOTO ABEND1
+    END
+
+/.##取込／累積件数リスト##./
+SKE0230L:
+
+    ?STEP :=   'SKE0230L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-SKE0230L.TOKELIB,PARA-(?P1,?P2,?P3,?P4,?P5,?P6)
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '【件数リスト発行】'
+              ?SKEKA := '5'
+              GOTO ABEND1
+    END
+
+/.##受信出荷情報Ｆ初期化##./
+PCLR1:
+
+    ?STEP :=   'PCLR1   '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CLRFILE FILE-?RCVSYUF
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '【出荷検品ＤＴ初期化】'
+              ?SKEKA := '6'
+              GOTO ABEND1
+    END
+
+/.##エラーＦＳＯＲＴ##./
+PSORT:
+
+    ?STEP :=   'PSORT   '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    SORT    INFILE-?RCVERRF,INRL-118,INBF-34,
+            OUTFILE-?RCVERRF,OUTBF-34,
+            KEY-1!54!CA,
+            RCDL-@DSP
+
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【エラーＤＴＳＯＲＴ】'
+              GOTO ABEND
+    END
+
+/.##エラー重複チェック処理##./
+SKE1000B:
+
+    ?STEP :=   'SKE1000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-RCVERRF1,TOFILE-?RCVERRF
+    OVRF      FILE-RCVERRF2,TOFILE-RCVOKN.TOKBLIB
+    OVRF      FILE-RCVERRF3,TOFILE-RCVNGN.TOKBLIB
+    CALL      PGM-SKE1005B.TOKELIBO
+    IF        @PGMEC    ^=   0
+              THEN
+              ?KEKA4 :=  '【エラーＤＴ重複チェック】'
+              GOTO ABEND
+    END
+
+
+/.##エラー重複チェック後戻し##./
+PERRFILE:
+
+    ?STEP :=   'PERRFILE'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CNVFILE FILE-RCVOKN.TOKBLIB,TOFILE-?RCVERRF,ADD-@NO,BF-34
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '【前回エラーＣＯＰＹ】'
+              GOTO ABEND1
+    END
+RTN: /.##ﾌﾟﾛｸﾞﾗﾑ正常時、終了ﾒｯｾｰｼﾞ##./
+
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  '更新結果等を確認して下さい。'
+    ?KEKA3 :=  ''
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.##資源開放##./
+    RELEASE FILE-RCVDATF.TOKKLIB!@XCL    /.##出荷検品情報ﾌｧｲﾙ##./
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:/.##ﾌﾟﾛｸﾞﾗﾑ異常終了時、終了ﾒｯｾｰｼﾞ##./
+
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+/.##資源開放##./
+    RELEASE FILE-RCVDATF.TOKKLIB!@XCL    /.##出荷検品情報ﾌｧｲﾙ##./
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND1:/.##ﾌﾟﾛｸﾞﾗﾑ異常終了時、終了ﾒｯｾｰｼﾞ##./
+
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    ?KEKA4 :=  '（更新処理中）'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+/.##資源開放##./
+    RELEASE FILE-RCVDATF.TOKKLIB!@XCL    /.##出荷検品情報ﾌｧｲﾙ##./
+
+    RETURN    PGMEC-@PGMEC
+

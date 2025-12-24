@@ -1,0 +1,178 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    営業所データ連携                     *  ./
+/. *   JOB-ID      :    PFU00400                             *  ./
+/. *               :    振替依頼データ本社送信               *  ./
+/. *   JOB-NAME    :    営業所振替依頼ﾃﾞｰﾀ抽出－送信         *  ./
+/. ***********************************************************  ./
+    PGM (P1-?HIDUKE,P2-?JIKAN,P3-?TOKCD)
+/.###ﾊﾟﾗﾒﾀ定義####./
+    PARA ?HIDUKE  ,STRING*8,IN,VALUE-'        ' /.日付./
+    PARA ?JIKAN   ,STRING*4,IN,VALUE-'    '     /.時間./
+    PARA ?TOKCD   ,STRING*8,IN,VALUE-'        ' /.取引先CD./
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?FILNM    ,STRING*8,VALUE-'        '    /.ﾌｧｲﾙ名合併用./
+    VAR ?SPATHNM  ,STRING*8,VALUE-'        '    /.ﾊﾟｽ名合併用./
+    VAR ?SNODENM  ,STRING*8,VALUE-'        '    /.ﾊﾟｽ名合併用./
+    VAR ?FILNMH   ,STRING*6,VALUE-'FUIRAI'      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?SPATHH   ,STRING*6,VALUE-'IHPATH'      /.ﾊﾟｽ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?SNODEH   ,STRING*6,VALUE-'IHNODE'      /.ﾉｰﾄﾞ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?LIBNM    ,STRING*8,VALUE-'TOKFLIB '    /.ﾗｲﾌﾞﾗﾘ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILID    ,NAME                         /.ﾌｧｲﾙ名名前型./
+    VAR ?LIBID    ,NAME                         /.ﾗｲﾌﾞﾗﾘ名名前型./
+    VAR ?SPATHID  ,NAME                         /.ﾊﾟｽ名名前型./
+    VAR ?SNODEID  ,NAME                         /.ﾉｰﾄﾞ名名前型./
+    VAR ?FUIRAI   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?FUIRAIN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SCOMNM   ,NAME!MOD                     /.ﾊﾟｽ.ﾉｰﾄﾞ./
+    VAR ?SCOMNMF  ,STRING*17                    /.ﾊﾟｽ.ﾉｰﾄﾞ名表示用./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PFU00400'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?SOKCD    ,STRING*2,VALUE-'  '          /.倉庫      ./
+    VAR ?DSOKCD   ,STRING*2                     /.代表倉庫  ./
+    VAR ?SOSIN    ,STRING*2,VALUE-'01'          /.送信ID    ./
+    VAR ?OPR1     ,STRING*50                    /.ﾒｯｾｰｼﾞ1   ./
+    VAR ?OPR2     ,STRING*50                    /.      2   ./
+    VAR ?OPR3     ,STRING*50                    /.      3   ./
+    VAR ?OPR4     ,STRING*50                    /.      4   ./
+    VAR ?OPR5     ,STRING*50                    /.      5   ./
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##振替依頼データ送信##./
+
+    ?OPR1  :=  '　＃＃＃＃＃　振替依頼データ送信処理　＃＃＃＃＃　'
+    ?OPR2  :=  '　　振替依頼データを本社へ送信します。'
+    ?OPR3  :=  '　　振替依頼チェックリストは出力済みですか。'
+    ?OPR4  :=  '　　確認して下さい。'
+    ?OPR5  :=  '　＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+
+/.  倉庫ＣＤ取得                                              ./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WKSTN,?SOKCD,?DSOKCD)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.##ﾌｧｲﾙ名称取得##./
+FILNMCHG:
+
+    ?MSGX := '## 営業所ｺｰﾄﾞ   = ' && ?SOKCD && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?FILNMH && ?SOKCD     /.ﾃﾞﾌｫﾙﾄﾌｧｲﾙ名+倉庫CD./
+    ?FILID    :=    %NAME(?FILNM)         /.ﾌｧｲﾙ名名前型変換   ./
+    ?LIBID    :=    %NAME(?LIBNM)         /.ﾗｲﾌﾞﾗﾘ名名前型変換 ./
+    ?FUIRAI   :=    %NCAT(?FILID,?LIBID)  /.ﾌｧｲﾙ名.ﾗｲﾌﾞﾗﾘ名    ./
+    ?FUIRAIN  :=    %STRING(?FUIRAI)
+    ?MSGX     :=    '## 営業所ﾌｧｲﾙ名 = ' && ?FUIRAIN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+
+    DLTFILE   FILE-?FUIRAI
+    CRTFILE   FILE-?FUIRAI,SIZE-200,ESIZE-10,ORG-@SF,RL-80
+
+
+/.##振替依頼データ抽出＆削除##./
+SFU0040B:
+
+    ?STEP :=   'SFU0040B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-FUIRAIL1,TOFILE-FUIRAIL1.TOKFLIB
+    OVRF      FILE-FUIRAI2,TOFILE-?FUIRAI
+    CALL      PGM-SFU0040B.TOKELIB,PARA-(?SOKCD,?DSOKCD)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.##送信用ファイルバックアップコピー##./
+
+
+    DLTFILE FILE-FUIRAIBK.TOKFLIB
+    CPYFILE FILE-?FUIRAI,TOFILE-FUIRAIBK.TOKFLIB,
+            CRTFILE-@YES
+
+
+/.##パス名＋ノード名取得##./
+
+    ?SPATHNM  :=    ?SPATHH && ?SOSIN
+    ?SNODENM  :=    ?SNODEH && ?SOSIN
+    ?SPATHID  :=    %NAME(?SPATHNM)
+    ?SNODEID  :=    %NAME(?SNODENM)
+    ?SCOMNM   :=    %NCAT(?SPATHID,?SNODEID)
+    ?SCOMNMF  :=    %STRING(?SCOMNM)
+    ?MSGX     :=    '## 送信ﾊﾟｽ名 = ' && ?SCOMNMF && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##オンラインデータ送信##./
+SNDFILE1:
+
+    ?STEP :=   'SNDFILE1'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX     :=    '## ｵﾝﾗｲﾝﾃﾞｰﾀ送信中   ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    SNDFILE COM-?SCOMNM,SFILE-?FUIRAI,DFILE-'FUIRAISF',
+            RL-80,BF-1,USING-A
+    IF        @PGMEC    ^=   0
+          THEN
+              ?MSGX     :=    '## 振替依頼ﾃﾞｰﾀ送信異常 ##'
+              SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO ABEND
+          ELSE
+              ?MSGX     :=    '## 振替依頼ﾃﾞｰﾀ送信完了 ##'
+              SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    END
+
+
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

@@ -1,0 +1,287 @@
+/. ***********************************************************  ./
+/. *   サカタのタネ　　　　　　　　　　　　　　　　　        *  ./
+/. *   SYSTEM-NAME :    ＡＭＡＺＯＮ　ＥＤＩ　　　　　　　   *  ./
+/. *   JOB-ID      :    PSY93060                             *  ./
+/. *   JOB-NAME    :    AMAZON出荷確定データ更新　　　　　   *  ./
+/. *   UPDATE      :    2020/11/16 S22460460                 *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC  ,INTEGER
+    VAR       ?PGMECX ,STRING*11
+    VAR       ?PGMEM  ,STRING*99
+    VAR       ?MSG    ,STRING*99(6)
+    VAR       ?MSGX   ,STRING*99
+    VAR       ?PGMID  ,STRING*8,VALUE-'PSY93060'
+    VAR       ?STEP   ,STRING*8
+    VAR       ?WKSTN  ,STRING*8
+    VAR       ?JBNM   ,STRING*24!MIXED            /.業務漢字名 ./
+    VAR       ?JBID   ,STRING*10                  /.業務ＩＤ   ./
+    VAR       ?PGID   ,STRING*10                  /.ＰＧＩＤ　 ./
+    VAR       ?CHK    ,STRING*1,VALUE-'0'         /.ﾊﾟﾗﾒﾀﾁｪｯｸ./
+    VAR       ?CHK1   ,STRING*1,VALUE-'0'         /.ﾊﾟﾗﾒﾀﾁｪｯｸ./
+    VAR       ?CHK2   ,STRING*1,VALUE-'0'         /.ﾊﾟﾗﾒﾀﾁｪｯｸ./
+    VAR       ?HIDUKE ,STRING*8,VALUE-'        '  /.バッチ日付./
+    VAR       ?JIKAN  ,STRING*4,VALUE-'    '      /.バッチ時間./
+    VAR       ?ERR      ,STRING*2,VALUE-'  '
+    VAR       ?JOB      ,STRING*1,VALUE-'4'      /.4:出荷ﾃﾞｰﾀ取込./
+/.-----------------------------------------------------------./
+    VAR       ?CLID   ,STRING*8                   /.ＣＬＩＤ   ./
+    VAR       ?MSG1   ,STRING*80                  /.開始終了MSG./
+    VAR       ?OPR1   ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2   ,STRING*50                  /.      2    ./
+    VAR       ?OPR3   ,STRING*50                  /.      3    ./
+    VAR       ?OPR4   ,STRING*50                  /.      4    ./
+    VAR       ?OPR5   ,STRING*50                  /.      5    ./
+    VAR       ?PGNM   ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1  ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2  ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3  ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4  ,STRING*40                  /.      5    ./
+    VAR       ?PGCHK1 ,STRING*1,VALUE-' '         /.      5    ./
+    VAR       ?PGCHK2 ,STRING*1,VALUE-' '         /.      5    ./
+    VAR       ?PGCHK3 ,STRING*1,VALUE-' '         /.      5    ./
+    VAR       ?BUMON  ,STRING*4,VALUE-'    '
+    VAR       ?TANCD8 ,STRING*8,VALUE-'        '
+    VAR       ?TANCD  ,STRING*2,VALUE-'  '
+    VAR       ?SYORIKN1 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN2 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN3 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN4 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN5 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORINM1 ,STRING*40
+    VAR       ?SYORINM2 ,STRING*50
+    VAR       ?SYORINM3 ,STRING*50
+
+    DEFLIBL TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO/TOKSOLIB/
+            TOKDLIB/TOKDTLIB
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  'ＡＭＡＺＯＮ　出荷確定データ更新'
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+STEP000:
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##確認画面##./
+STEP010:
+
+    ?OPR1  :=  '【ＡＭＡＺＯＮ　出荷確定データ更新】　'
+    ?OPR2  :=  'データ準備は完了していますか？'
+    ?OPR3  :=  '完了している場合、変換処理を実行して下さい。'
+    ?OPR4  :=  ''
+    ?OPR5  :=  '処理後、件数等を確認して下さい。　　　　　　'
+    CALL      OHOM0900.XUCL,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+STEP020:
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB/TOKKLIB/TOKDLIB/TOKDTLIB/
+            TOKJLIB/ONLBLIB/TOKSOLIB
+
+/.## ログインユーザー情報取得 ##./
+SIT9000B:
+
+    ?STEP :=  'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD8)
+    ?PGMEC    :=   @PGMEC
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4    := '【ログインユーザー情報取得】'
+              GOTO ABEND
+    END
+    ?TANCD    :=   ?TANCD8
+
+/.##確定データ取込##./
+STEP030:
+
+    ?STEP :=   'STEP030 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    SNDMSG  'ASSIGN AMZSYKWK.TOKDTLIB',TO-XCTL
+    ASSIGN  FILE-AMZSYKWK.TOKDTLIB!@XCL
+    ?PGMEC   :=   @PGMEC
+    IF      ?PGMEC    ^=   0    THEN
+            ?KEKA4 := '【排他制御ファイルロック】'
+            GOTO ABEND
+    END
+
+    SNDMSG  'DLTFILE AMZSYKBK.TOKDTLIB',TO-XCTL
+    DLTFILE AMZSYKBK.TOKDTLIB
+
+    SNDMSG  'CPYFILE AMZSYKWK-AMZSYKBK',TO-XCTL
+    CPYFILE  FILE-AMZSYKWK.TOKDTLIB,TOFILE-AMZSYKBK.TOKDTLIB,
+             CRTFILE-@YES
+    ?PGMEC   :=   @PGMEC
+    IF      ?PGMEC    ^=   0    THEN
+            ?KEKA4 := '【出荷データ退避】'
+            GOTO ABEND
+    END
+
+    SNDMSG  'CNVDF AMZSYKWK.TOKDTLIB',TO-XCTL
+  /. 社内テスト用 ./
+  /.CNVDF FILE-AMZSYKWK.TOKDTLIB,
+          PATH-'/NAVPC/AMAZONNAVS/KAKUTEI.CSV',
+          MODE-@IMP,ADD-@NO,ACTCHK-@NO,EXTCNV-@YES  ./
+  /. 実機本番用 ./
+    CNVDF FILE-AMZSYKWK.TOKDTLIB,
+          PATH-'/HGNAS/AMAZONNAVS/KAKUTEI.CSV',
+          MODE-@IMP,ADD-@NO,ACTCHK-@NO,EXTCNV-@YES
+    ?PGMEC  :=   @PGMEC
+    IF      ?PGMEC    ^=   0    THEN
+            ?KEKA4 := '【出荷データ取込】'
+            GOTO ABEND
+    END
+
+/.##AMAZON取込データ編集(出荷)##./
+NJH9306B:
+
+    ?STEP :=   'NJH9306B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-AMZSYKW1,TOFILE-AMZSYKW1.TOKDTLIB
+    OVRF      FILE-AMZSYKPF,TOFILE-AMZSYKPF.TOKDTLIB
+    OVRF      FILE-AMZJOHL1,TOFILE-AMZJOHL1.TOKDTLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-NJH9306B.TOKSOLIB,PARA-(?BUMON,?TANCD,
+                                          ?SYORIKN1,?ERR)
+    ?PGMEC    :=   @PGMEC
+    SNDMSG    ?SYORIKN1,TO-XCTL.@ORGPROF,JLOG-@YES
+    SNDMSG    ?ERR,TO-XCTL.@ORGPROF,JLOG-@YES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '【出荷データ取込】'
+              GOTO      ABEND
+    END
+    IF        ?ERR       =  'OK'  THEN
+              GOTO      SSY9307B
+    ELSE
+              ?PGCHK1   :=  '1'
+              GOTO      SSY9305V
+    END
+
+/.##AMAZON出荷確定データ更新制御##./
+SSY9307B:
+
+    ?STEP :=   'SSY9307B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-AMZSYKW1,TOFILE-AMZSYKW1.TOKDTLIB
+    OVRF      FILE-AMZSYKPF,TOFILE-AMZSYKPF.TOKDTLIB
+    OVRF      FILE-AMZJOHL1,TOFILE-AMZJOHL1.TOKDTLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+
+    CALL      PGM-SSY9307B.TOKSOLIB,PARA-(?BUMON,?TANCD)
+    ?PGMEC    :=   @PGMEC
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '【出荷確定データ更新】'
+              GOTO ABEND
+    END
+
+  /.取込結果リスト ./
+    DEFLIBL TOKELIBO/TOKELIB
+    OVRPRTF FILE-PRTF,TOFILE-PRTF.TOKELIB,MEDLIB-TOKELIBO
+    ?SYORINM1 := '【ＡＭＡＺＯＮ出荷データ変換・更新】'
+    ?SYORINM2 := 'ＡＭＡＺＯＮ出荷データ取込　終了しました。'
+    ?SYORINM3 := '件数１：出荷件数'
+    CALL SSN0050L.TOKELIBO,
+          PARA-(?SYORINM1,?SYORINM2,?SYORINM3,?SYORIKN1,?SYORIKN2,
+                ?SYORIKN3,?SYORIKN4,?SYORIKN5)
+
+    DEFLIBL TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO/TOKSOLIB/
+            TOKDLIB/TOKDTLIB
+
+/.##AMAZON出荷確認CSV出力##  ./
+SSY9305V:
+
+    ?STEP :=   'SSY9305V'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-AMZCHKW1,TOFILE-AMZSYKL2.TOKDTLIB
+    CALL      SSY9305V.TOKSOLIB,PARA-(?JOB)
+    ?PGMEC    :=   @PGMEC
+    IF        ?PGMEC  ^=  0  THEN
+              ?KEKA4 := '【出荷確認ＣＳＶ出力】'
+              GOTO    ABEND
+    END
+
+/.##ＣＳＶ転送##./
+    CALL SCVMSG.TOKELIB,PARA-('ﾍﾝｶﾝ CSV ﾃﾝｿｳ       ')
+FIMPORT1:
+
+    ?STEP :=   'FIMPORT1'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    FIMPORT FILE-AMZCHKCS.TOKDTLIB,
+            TYPE-@FILE,
+            PARA-AMAZON,
+            UNIT-4,
+            OPR-@NO
+
+    ?PGMEC    :=   @PGMEC
+    IF        ?PGMEC  ^=  0  THEN
+              ?KEKA4 := '【出荷確認ＣＳＶ転送】'
+              GOTO    ABEND
+    END
+
+    IF      ?PGCHK1  =  '1'  THEN
+             GOTO    ABEND
+    END
+
+/.##プログラム正常終了（資源の開放）##./
+RTN:
+
+    RELEASE FILE-AMZSYKWK.TOKDTLIB!@XCL
+
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    ?KEKA1 :=  'ＡＭＡＺＯＮ変換処理が正常終了しました'
+    ?KEKA2 :=  '件数リスト等を確認して下さい。'
+    ?KEKA3 :=  ''
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+/.##プログラム異常終了（資源の開放－＞ログリスト出力）##./
+ABEND:
+
+    ?PGMEM    :=    @PGMEM
+    RELEASE FILE-AMZSYKWK.TOKDTLIB!@XCL
+
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    IF      ?PGCHK1  =  ' '  THEN
+            ?KEKA1 := 'ＡＭＡＺＯＮ変換処理が異常終了しました'
+            ?KEKA2 := 'ログ採取し，ＮＡＶへ連絡して下さい。'
+            ?KEKA3 := ''
+    END
+    IF      ?PGCHK1  =  '1'  THEN
+            ?KEKA1 := '出荷データチェックでエラーがあります。'
+            ?KEKA2 := 'データ、マスタを確認・修正し'
+            ?KEKA3 := '再度実行してください。'
+    END
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

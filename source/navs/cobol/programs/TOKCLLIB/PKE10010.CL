@@ -1,0 +1,116 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　本社システム                          *  ./
+/. *   SYSTEM-NAME :    出荷検品システム                     *  ./
+/. *   JOB-ID      :    PKE10010                             *  ./
+/. *   JOB-NAME    :    振分倉庫一括変更　　　　　　　       *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMES    ,STRING*05                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PKE10010'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門CD./
+    VAR ?TANCD8   ,STRING*8,VALUE-'        '    /.担当者CD./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+    VAR ?P4       ,STRING*2,VALUE-'00'          /.倉庫(自)  ./
+    VAR ?P5       ,STRING*2,VALUE-'00'          /.倉庫(代表)./
+    VAR ?SYORINM1 ,STRING*50
+    VAR ?SYORINM2 ,STRING*40
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKKLIB/TOKDLIB/TOKDTLIB/TOKKPLIB
+              /BMSFLIB
+/.##ログインユーザー情報取得##./
+STEP030:
+
+    ?STEP :=   'STEP030'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD8)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND
+    END
+    ?TANCD := ?TANCD8
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?P4,?P5)
+    IF        @PGMEC    ^=   0   THEN
+              GOTO ABEND
+    END
+
+/.##振分倉庫一括変更（発注ＭＳＧ）##./
+NKE1001B:
+
+    ?STEP :=   'NKE1001B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    OVRF      FILE-SHTDENLA,TOFILE-SHTDENLA.TOKFLIB
+    OVRF      FILE-BMSHACL3,TOFILE-BMSHACL3.BMSFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    CALL      PGM-NKE1001B.TOKSOLIB,PARA-(?P4,?P5)
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMES    :=    @PGMES
+  /.SNDMSG MSG-'PGMES=',TO-XCTL.@ORGPROF,JLOG-@YES
+    SNDMSG MSG-?PGMES,TO-XCTL.@ORGPROF,JLOG-@YES./
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+         IF   ?PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO RTN
+         ELSE
+              GOTO ABEND
+         END
+    END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+ABEND:
+
+ /. ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM  ./
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

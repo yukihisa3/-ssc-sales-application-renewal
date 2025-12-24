@@ -1,0 +1,280 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　　　　　　　　　　　　　　　          *  ./
+/. *   SYSTEM-NAME :    ヨドバシ　　　ＥＤＩ　　　　　　　   *  ./
+/. *   JOB-ID      :    PSY95200                             *  ./
+/. *   JOB-NAME    :    ヨドバシ納品明細リスト前処理～発行　 *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PSY95200'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8,VALUE-'        '    /.STEP-ID./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門CD./
+    VAR ?TANCD8   ,STRING*8,VALUE-'        '    /.担当者CD./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+
+    VAR ?JDATE    ,STRING*8,VALUE-'00000000'    /.受信日付  ./
+    VAR ?JTIME    ,STRING*4,VALUE-'0000'        /.受信時間  ./
+    VAR ?JTORI    ,STRING*8,VALUE-'00000000'    /.受信取引先./
+    VAR ?SOKCD    ,STRING*2,VALUE-'00'          /.倉庫(自)  ./
+    VAR ?DSOKCD   ,STRING*2,VALUE-'00'          /.倉庫(代表)./
+    VAR ?NDATES   ,STRING*8,VALUE-'00000000'    /.納品日開始./
+    VAR ?NDATEE   ,STRING*8,VALUE-'00000000'    /.納品日終了./
+
+    VAR ?KENSU    ,STRING*7,VALUE-'0000000'     /.作成件数./
+    VAR ?KAKUTEI  ,STRING*1,VALUE-' '           /.確定済FLG./
+
+    VAR ?SYORINM1 ,STRING*40
+    VAR ?SYORINM2 ,STRING*50
+    VAR ?SYORINM3 ,STRING*50
+    VAR ?SYORIKN1 ,STRING*7,VALUE-'0000000'
+    VAR ?SYORIKN2 ,STRING*7,VALUE-'0000000'
+    VAR ?SYORIKN3 ,STRING*7,VALUE-'0000000'
+    VAR ?SYORIKN4 ,STRING*7,VALUE-'0000000'
+    VAR ?SYORIKN5 ,STRING*7,VALUE-'0000000'
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+    VAR ?JOB      ,STRING*01,VALUE-'3'        /.3:出荷通知CSV出力./
+/.##実行PG名称ｾｯﾄ##./
+    ?PGNM := 'ヨドバシ納品明細リスト前処理～発行'
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKELIBO/TOKSOLIB/TOKFLIB/TOKKLIB/TOKDTLIB
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.## ログインユーザー情報取得 ##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD8)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ログインユーザー情報取得'
+              GOTO ABEND
+    END
+    ?TANCD := ?TANCD8
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?SOKCD,?DSOKCD)
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  'ＷＳ－倉庫取得'
+              GOTO ABEND
+    END
+
+/.##ヨドバシ納品明細リスト発行指示##./
+SSY9520I:
+
+    ?STEP :=  'SSY9520I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    CASE  ?SOKCD  OF
+       # 'TU' #
+       ?MSGX :=  '##　ＡＷ札幌配送センター出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRTTU.TOKELIBO,MEDLIB-TOKELIBO
+       # '6A' #
+       ?MSGX :=  '##　片岡配送センター　　出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRT6A.TOKELIBO,MEDLIB-TOKELIBO
+       # 'TK' #
+       ?MSGX :=  '##　さくら配送センター　出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRTTK.TOKELIBO,MEDLIB-TOKELIBO
+       # '63' #
+       ?MSGX :=  '##　フバサミ配送センター出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRT63.TOKELIBO,MEDLIB-TOKELIBO
+       # '84' #
+       ?MSGX :=  '##　鴻巣配送センター　　出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRT84.TOKELIBO,MEDLIB-TOKELIBO
+       # 'TV' #
+       ?MSGX :=  '##　西尾配送センター　　出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRTTV.TOKELIBO,MEDLIB-TOKELIBO
+       # 'T5' #
+       ?MSGX :=  '##　ＫＡ岡山配送センター出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRTT5.TOKELIBO,MEDLIB-TOKELIBO
+       # 'E1' #
+       ?MSGX :=  '##　甘木配送センター　　出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRTE1.TOKELIBO,MEDLIB-TOKELIBO
+       # '01' #
+       ?MSGX :=  '##　本社　　　　　　　　出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRT01.TOKELIBO,MEDLIB-TOKELIBO
+    ELSE
+       ?MSGX :=  '##　出力判定不能　本社へ出力　##'
+       SNDMSG    ?MSGX,TO-XCTL
+       OVRPRTF FILE-XU04LP,TOFILE-LBPPRT01.TOKELIBO,MEDLIB-TOKELIBO
+    END
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    OVRF      FILE-SHTDENLJ,TOFILE-SHTDENLJ.TOKKLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    CALL      PGM-SSY9520I.TOKSOLIB
+      ,PARA-(?JDATE,?JTIME,?JTORI,?SOKCD,?NDATES,?NDATEE,?DSOKCD)
+    IF        @PGMEC    ^=   0    THEN
+         IF   @PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              RETURN
+         ELSE
+              ?KEKA4 :=  '納品明細リスト発行指示'
+              GOTO ABEND
+         END
+    END
+
+    ?MSGX :=  'バッチ（日）＝' && ?JDATE
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  'バッチ（時）＝' && ?JTIME
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  'バッチ（取）＝' && ?JTORI
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '出力倉庫　　＝' && ?SOKCD
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '日付(開始)　＝' && ?NDATES
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '日付(終了)　＝' && ?NDATEE
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ヨドバシ出荷通知データ抽出##./
+SSY9521B:
+
+    ?STEP :=   'SSY9521B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-SHTDENLJ,TOFILE-SHTDENLJ.TOKKLIB
+    OVRF      FILE-YODJOHL2,TOFILE-YODJOHL2.TOKDTLIB
+    OVRF      FILE-YODSNDL3,TOFILE-YODSNDL3.TOKDTLIB
+    CALL      PGM-SSY9521B.TOKSOLIB,PARA-(?JDATE,?JTIME,?JTORI,?SOKCD,
+                                          ?NDATES,?NDATEE,
+                                          ?SYORIKN1,?KAKUTEI)
+
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '出荷通知データ抽出'
+              GOTO ABEND
+    END
+
+    ?MSGX :=  '抽出件数　　＝' && ?SYORIKN1
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '確定済　　　＝' && ?KAKUTEI
+    SNDMSG    ?MSGX,TO-XCTL
+
+    IF    ?KAKUTEI ^= '0' THEN
+          GOTO  SSY9523L
+    END
+
+/.##ヨドバシ出荷通知番号採番##./
+SSY9522B:
+
+    ?STEP :=   'SSY9522B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-YODSNDL2,TOFILE-YODSNDL2.TOKDTLIB
+    OVRF      FILE-YODJOHL2,TOFILE-YODJOHL2.TOKDTLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    CALL      PGM-SSY9522B.TOKSOLIB,PARA-(?JDATE,?JTIME,?JTORI,?SOKCD,
+                                          ?NDATES,?NDATEE)
+
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '出荷通知番号採番'
+              GOTO ABEND
+    END
+
+    SNDMSG    ?SYORIKN1,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##ヨドバシ納品明細リスト##./
+SSY9523L:
+
+    ?STEP :=   'SSY9523L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-SSY9523L.TOKSOLIB,PARA-(?JDATE,?JTIME,?JTORI,?SOKCD,
+                                          ?NDATES,?NDATEE)
+
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ヨドバシ納品明細リスト'
+              GOTO ABEND
+    END
+
+/.##ヨドバシ出荷通知番号リスト##./
+SSY9524L:
+
+    ?STEP :=   'SSY9524L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.  CALL      PGM-SSY9524L.TOKSOLIB,PARA-(?JDATE,?JTIME,?JTORI,?SOKCD,
+                                          ?NDATES,?NDATEE)
+./  IF      @PGMEC    ^=   0    THEN
+            ?KEKA4 := 'ヨドバシ出荷通知番号リスト'
+                    GOTO ABEND
+    END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    =  0        THEN
+       IF     ?SYORIKN1 = '0000000' THEN
+              ?KEKA1   := '対象データ０件です。'
+              ?KEKA2   := '指示条件や売上伝票データ有無を'
+              ?KEKA3   := '確認してください。'
+       END
+    ELSE
+              ?KEKA1 :=  '処理が異常終了しました。'
+              ?KEKA2 :=  'ログリストを採取後、ＮＡＶへ連絡'
+              ?KEKA3 :=  ''
+    END
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

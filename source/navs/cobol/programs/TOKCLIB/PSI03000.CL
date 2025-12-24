@@ -1,0 +1,68 @@
+/. ************************************************************ ./
+/. *     サカタのタネ　特販システム                           * ./
+/. *     ホーマーグリーン支払データ変換処理                   * ./
+/. *     取引先：ホーマーグリーン                             * ./
+/. *     作成者：NAV T.TAKAHASHI                              * ./
+/. *     作成日：00/07/28                     ID:PSI03000      * ./
+/. ************************************************************ ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMECY   ,STRING*4
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*13
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSI03000'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?CHK      ,STRING*1
+/.-----------------------------------------------------------./
+    VAR       ?PGNM     ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                  /.      5    ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  'ホーマーグリーン関東　支払データ受信処理'
+
+/.ライブラリリストの登録                                        ./
+    DEFLIBL CVCSLBI/CVCSOBJ
+
+/.##（ホーマーＧ）支払変換起動##./
+SSI0300B:
+
+    ?STEP :=   'SSI0300B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF FILE-HOMCF,TOFILE-HOGSHI.ONLBLIB
+    OVRF FILE-HSHIGKF,TOFILE-SITGKF39.TOKFLIB
+    CALL  SSI0300B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABENDK END
+
+OWARI:
+
+    DEFLIBL TOKELIB/TOKFLIB
+    ?KEKA1 :=  'ホーマーグリーン支払データ変換処理が正常'
+    ?KEKA2 :=  '終了しました。'
+    ?KEKA3 :=  '支払明細書出力が可能です。'
+    ?KEKA4 :=  ''
+    CALL SMG0020L.TOKELIB
+                    ,PARA-(?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    RETURN    PGMEC-@PGMEC
+
+ABENDK:
+
+    /.## エラーリスト出力 ##./
+    DEFLIBL TOKELIB/TOKFLIB
+    ?KEKA1 :=  'ホーマーグリーン支払データ変換処理が異常'
+    ?KEKA2 :=  '終了しました。'
+    ?KEKA3 :=  'ログリスト採取し、ナブ・アシストまで連絡'
+    ?KEKA4 :=  'して下さい。'
+    CALL SMG0020L.TOKELIB
+                    ,PARA-(?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    SNDMSG MSG-'## 受信異常 ##',TO-XCTL.@ORGPROF
+    DSPLOG    OUTPUT-@LIST,EDT-@JEF
+    RETURN    PGMEC-@PGMEC
+

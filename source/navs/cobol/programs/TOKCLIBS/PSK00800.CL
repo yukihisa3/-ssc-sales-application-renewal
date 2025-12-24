@@ -1,0 +1,130 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　ＨＧ基幹システム　　　　　　          *  ./
+/. *   SYSTEM-NAME :    ケーヨー伝票レスシステム             *  ./
+/. *   JOB-ID      :    PSK00800                             *  ./
+/. *   JOB-NAME    :    ケーヨー売上データ累積処理           *  ./
+/. *                                                         *  ./
+/. ***********************************************************  ./
+/.  PGM  (P1-?KBN)./
+    PGM
+/.###ﾊﾟﾗﾒﾀ定義####./
+/.  PARA      ?KBN      ,STRING*2,OUT,VALUE-'  '  ./
+    VAR       ?KBN      ,STRING*2,VALUE-'  '
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSK00800'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?JBNM     ,STRING*24!MIXED            /.業務漢字名 ./
+    VAR       ?JBID     ,STRING*10                  /.業務ＩＤ   ./
+    VAR       ?PGID     ,STRING*10                  /.ＰＧＩＤ　 ./
+/.-----------------------------------------------------------./
+    VAR       ?CLID     ,STRING*8                   /.ＣＬＩＤ   ./
+    VAR       ?MSG1     ,STRING*80                  /.開始終了MSG./
+    VAR       ?PGNM     ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                  /.      5    ./
+    VAR       ?OK       ,STRING*2,VALUE-'OK'        /.ﾊﾟﾗﾒﾀﾁｪｯｸ./
+    VAR       ?NG       ,STRING*2,VALUE-'NG'        /.ﾊﾟﾗﾒﾀﾁｪｯｸ./
+
+/.PG名称ｾｯﾄ./
+
+    ?PGNM  :=  'ケーヨー売上データ累積処理'
+
+/.ﾗｲﾌﾞﾗﾘﾘｽﾄ登録./
+
+    DEFLIBL TOKELIB/TOKFLIB/TOKKLIB
+
+    ?MSGX :=  '*** ' && ?PGMID && ' START(ｹｰﾖｰ売上累積)  ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.## 売上累積データバックアップ（前回分データ削除） ##./
+KDATACLR:
+
+    ?STEP :=   %LAST(LABEL)      /.##ｼｮﾘﾒｯｾｰｼﾞ表示##./
+    ?MSGX :=  '*** ' && ?STEP && '      (前回分CLR)     ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    DLTFILE KEIURIW.BAKFLIB
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '前回バックアップＤＴ削除'
+              GOTO ABEND
+    END
+
+/.## 売上累積データバックアップ ##./
+KDATABUP:
+
+    ?STEP :=   %LAST(LABEL)      /.##ｼｮﾘﾒｯｾｰｼﾞ表示##./
+    ?MSGX :=  '*** ' && ?STEP && '      (累積前BACKUP)  ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CPYFILE FILE-KEIURIF.TOKKLIB,TOFILE-KEIURIW.BAKFLIB,
+            CRTFILE-@YES
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '売上累積データ累積前バックアップ'
+              GOTO ABEND
+    END
+
+/.## ケーヨー売上データ累積処理 ##./
+SSK0080B:
+
+    ?STEP :=   %LAST(LABEL)      /.##ｼｮﾘﾒｯｾｰｼﾞ表示##./
+    ?MSGX :=  '*** ' && ?STEP && '      (売上累積処理)  ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    OVRF FILE-SHTDENLP,TOFILE-SHTDENLP.TOKKLIB
+    OVRF FILE-KEIURIL1,TOFILE-KEIURIL1.TOKKLIB
+    OVRF FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL SSK0080B.TOKELIBO
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '売上累積データ累積処理'
+              GOTO ABEND
+    END
+
+RTN:
+
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB/TOKKLIB
+    ?KBN   :=  ?OK
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  '更新結果等を確認して下さい。'
+    ?KEKA3 :=  '『ケーヨー売上データ累積処理』'
+    ?KEKA4 :=  '（正常終了）'
+    CALL SMG0020L.TOKELIB
+                    ,PARA-(?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '*** ' && ?PGMID && ' END  (ｹｰﾖｰ売上累積)  ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    RETURN    PGMEC-?PGMEC
+
+ABEND:
+
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB/TOKKLIB
+    ?KBN   :=  ?NG
+    ?KEKA1 :=  'ケーヨー売上データ累積処理が異常終了し'
+    ?KEKA2 :=  'ました。結果リストをＨＧ部システム担当'
+    ?KEKA3 :=  '者に渡し、ＮＡＶへ連絡して下さい。　　'
+    CALL SMG0020L.TOKELIB
+                    ,PARA-(?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+
+    RETURN    PGMEC-?PGMEC
+

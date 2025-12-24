@@ -1,0 +1,103 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ殿　            　　　　　　　          *  ./
+/. *   SYSTEM-NAME :     在庫システム                        *  ./
+/. *   JOB-ID      :    PZA01000                             *  ./
+/. *   JOB-NAME    :    在庫管理表　　　　　                 *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PZA01000'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?SOKCD    ,STRING*2
+    VAR       ?DSOKCD   ,STRING*2
+    VAR       ?WKSTN    ,STRING*8
+    VAR       ?NWKSTN   ,NAME
+    ?NWKSTN   :=        @ORGWS
+    ?WKSTN    :=        %STRING(?NWKSTN)
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DEFLIBL   TOKFLIB/TOKELIB
+
+/.  倉庫ＣＤ取得　　　　                                        ./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WKSTN,?SOKCD,?DSOKCD)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.                                                              ./
+    CRTFILE   FILE-ZZAIWK.TOKFLIB,SIZE-4000,ESIZE-100
+    CHGFILE   FILE-ZZAIWK.TOKFLIB
+
+/.  在庫抽出　　　　　　                                        ./
+SZA0100I:
+
+    ?STEP :=   'SZA0100I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-ZAMZAIL1,TOFILE-ZAMZAIL1.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-ZZAIWK,TOFILE-ZZAIWK.TOKFLIB
+    CALL      PGM-SZA0100I.TOKELIB,PARA-(?SOKCD,?DSOKCD)
+    IF        @PGMEC     =   4050 THEN
+              GOTO RTN   END
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.  在庫管理表　　　　　                                        ./
+SZA0105L:
+
+    ?STEP :=   'SZA0105L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-HMEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-ZZAIWK,TOFILE-ZZAIWK.TOKFLIB
+    CALL      PGM-SZA0105L.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DLTFILE   ZZAIWK.TOKFLIB
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    DLTFILE   ZZAIWK.TOKFLIB
+    RETURN    PGMEC-@PGMEC
+

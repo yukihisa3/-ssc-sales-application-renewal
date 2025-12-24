@@ -1,0 +1,329 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　ＨＧ基幹システム　　　　　　          *  ./
+/. *   SYSTEM-NAME :    送受信システム　　　　　　　　　　　 *  ./
+/. *   JOB-ID      :    PSK00100                             *  ./
+/. *   JOB-NAME    :    ケーヨー受領受信データ取込処理       *  ./
+/. ***********************************************************  ./
+    PGM (P1-?HIDUKE,P2-?JIKAN,P3-?TOKCD,P4-?LINE,P5-?YUSEN,
+         P6-?LIBNM,P7-?FILNM,P8-?JKEKA)
+/.##ﾊﾟﾗﾒﾀ定義##./
+    PARA      ?HIDUKE   ,STRING*8,IN,VALUE-'        ' /.受信日付./
+    PARA      ?JIKAN    ,STRING*4,IN,VALUE-'    '     /.受信時間./
+    PARA      ?TOKCD    ,STRING*8,IN,VALUE-'        ' /.受信取引先./
+    PARA      ?LINE     ,STRING*1,IN,VALUE-' '        /.回線./
+    PARA      ?YUSEN    ,STRING*1,IN,VALUE-' '        /.回線優先./
+    PARA      ?LIBNM    ,STRING*8,IN,VALUE-'        ' /.集信LIB./
+    PARA      ?FILNM    ,STRING*8,IN,VALUE-'        ' /.集信FILE./
+    PARA      ?JKEKA    ,STRING*4,OUT,VALUE-'    '    /.結果./
+/.##ﾜｰｸﾃｲｷﾞ##./
+    VAR       ?PGMEC    ,INTEGER                    /.ﾘﾀｰﾝｺｰﾄﾞ./
+    VAR       ?PGMECX   ,STRING*11                  /.ﾘﾀｰﾝｺｰﾄﾞ変換./
+    VAR       ?PGMEM    ,STRING*99                  /.ﾘﾀｰﾝ名称./
+    VAR       ?MSG      ,STRING*99(6)               /.ﾒｯｾｰｼﾞ退避ﾜｰｸ./
+    VAR       ?MSGX     ,STRING*99                  /.ﾒｯｾｰｼﾞ表示用./
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSK00100'  /.PROGRAM-ID./
+    VAR       ?STEP     ,STRING*8                   /.STEP-ID./
+/.##ﾃﾞｰﾀ変換PG用ﾊﾟﾗﾒﾀ##./
+    VAR       ?PARA     ,STRING*14,VALUE-'              '
+/.##結果FLG用##./
+    VAR       ?KEKA     ,STRING*4,VALUE-'    '      /.結果FLGﾊﾟﾗﾒﾀ./
+/.##ﾌｧｲﾙ変換ﾜｰｸ##./
+    VAR       ?LIBN     ,NAME                       /.ﾗｲﾌﾞﾗﾘ名前型./
+    VAR       ?FILN     ,NAME                       /.ﾌｧｲﾙ名前型./
+    VAR       ?FILLIB   ,NAME!MOD                   /.ﾌｧｲﾙ拡張用./
+    VAR       ?FILID    ,STRING*17                  /.ﾌｧｲﾙ名表示用./
+
+STEP000:  /.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+
+    ?STEP :=   'STEP000 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    DEFLIBL   TOKELIB/TOKFLIB/TOKELIBO/TOKJLIB/TOKKLIB/ONLBLIB
+
+STEP005:  /.##当日スケジュールＭに”変換中”をセット##./
+
+    ?STEP :=   'STEP005 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    ?KEKA := 'K522'   /.##変換中ｺｰﾄﾞｾｯﾄ##./
+     CALL PGM-SNJ0730B.TOKELIBO,
+                   PARA-(?HIDUKE,?JIKAN,?TOKCD,?KEKA)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K617' /.## ABENDｺｰﾄﾞｾｯﾄ ##./
+              GOTO ABEND1
+    END
+
+STEP010:  /.##ﾌﾟﾛｸﾞﾗﾑｶｲｼﾒｯｾｰｼﾞ##./
+
+    ?STEP :=   'STEP010 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+STEP020:  /.##ﾃﾞｰﾀ変換PGﾍのﾊﾟﾗﾒﾀ作成##./
+
+    ?STEP :=   'STEP020 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    ?PARA :=   ?HIDUKE && ?JIKAN && ?LINE && ?YUSEN
+    SNDMSG ?PARA,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+STEP030:  /.##受信ﾌｧｲﾙノ編集##./
+
+    ?STEP :=   'STEP030 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    ?FILN   :=  %NAME(?FILNM)
+    ?LIBN   :=  %NAME(?LIBNM)
+    ?FILLIB :=  %NCAT(?FILN,?LIBN)
+    ?FILID  :=  %STRING(?FILLIB)
+    SNDMSG ?FILID,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+STEP040:  /.##前回バックアップデータ削除（受領データ）##./
+
+    ?STEP :=   'STEP040 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    DLTFILE FILE-KEIJYRF.BAKFLIB
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K613' /.## ABENDｺｰﾄﾞｾｯﾄ ##./
+              GOTO ABEND1
+    END
+
+STEP050:  /.##前回バックアップデータ削除（返品データ）##./
+
+    ?STEP :=   'STEP050 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    DLTFILE FILE-KEIJHRF.BAKFLIB
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K614' /.## ABENDｺｰﾄﾞｾｯﾄ ##./
+              GOTO ABEND1
+    END
+
+STEP060:  /.##バックアップ処理（受領データ）##./
+
+    ?STEP :=   'STEP060 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CPYFILE FILE-KEIJYRF.TOKKLIB,TOFILE-KEIJYRF.BAKFLIB,
+            CRTFILE-@YES
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K615' /.## ABENDｺｰﾄﾞｾｯﾄ ##./
+              GOTO ABEND1
+    END
+
+STEP070:  /.##バックアップ処理（返品データ）##./
+
+    ?STEP :=   'STEP070 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CPYFILE FILE-KEIJHRF.TOKKLIB,TOFILE-KEIJHRF.BAKFLIB,
+            CRTFILE-@YES
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K616' /.## ABENDｺｰﾄﾞｾｯﾄ ##./
+              GOTO ABEND1
+    END
+/.  CALL TWAIT.XUCL  ./
+
+STEP080:  /.##受信データ変換処理##./
+
+    ?STEP :=   'STEP080 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    OVRF      FILE-CVCSG001,TOFILE-?FILLIB
+    OVRF      FILE-SHTDENL5,TOFILE-SHTDENL5.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-JHMRUTL1,TOFILE-JHMRUTL1.TOKFLIB
+    OVRF      FILE-KEIJYOL1,TOFILE-KEIJYOL1.TOKKLIB
+    OVRF      FILE-JSMDAYL1,TOFILE-JSMDAYL1.TOKJLIB
+    OVRF      FILE-KEIJYRL1,TOFILE-KEIJYRL1.TOKKLIB
+    CALL      PGM-SSK0010B.TOKELIBO,PARA-(?PARA)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K618'     /.##ABENDｺｰﾄﾞｾｯﾄ##./
+              GOTO ABEND2
+    END
+
+STEP090:  /.##受領返品データ抽出処理##./
+
+    ?STEP :=   'STEP080 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    OVRF      FILE-KEIJYRL1,TOFILE-KEIJYRL1.TOKKLIB
+    OVRF      FILE-KEIJHRL1,TOFILE-KEIJHRL1.TOKKLIB
+    OVRF      FILE-KEIJYOL1,TOFILE-KEIJYOL1.TOKKLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    CALL      PGM-SSK0011B.TOKELIBO,PARA-(?PARA)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K620'     /.##ABENDｺｰﾄﾞｾｯﾄ##./
+              GOTO ABEND3
+    END
+
+STEP100:  /.##受領データ取込エラーリスト発行##./
+
+    ?STEP :=   'STEP100 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    OVRF      FILE-KEIJYRL1,TOFILE-KEIJYRL1.TOKKLIB
+    CALL      PGM-SSK0012L.TOKELIBO,PARA-(?PARA)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K611'     /.##ABENDｺｰﾄﾞｾｯﾄ##./
+              GOTO ABEND
+    END
+
+STEP110:  /.##受領データ取込件数リスト発行##./
+
+    ?STEP :=   'STEP110 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    OVRF      FILE-KEIJYOL1,TOFILE-KEIJYOL1.TOKKLIB
+    CALL      PGM-SSK0013L.TOKELIBO,PARA-(?HIDUKE,?JIKAN,?TOKCD)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA := 'K612'     /.##ABENDｺｰﾄﾞｾｯﾄ##./
+              GOTO ABEND
+    END
+
+/.##ﾌﾟﾛｸﾞﾗﾑ正常終了##./
+RTN:
+
+    ?KEKA  := 'K522'     /.##正常終了ｺｰﾄﾞｾｯﾄ##./
+    ?JKEKA := ?KEKA
+    /.##当日スケジュールマスタにエラーを更新する##./
+    CALL PGM-SNJ0730B.TOKELIBO,
+         PARA-(?HIDUKE,?JIKAN,?TOKCD,?KEKA)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    RETURN    PGMEC-@PGMEC
+
+/.##異常終了時##./
+ABEND:
+
+    /.##当日スケジュールマスタにエラーを更新する##./
+    CALL PGM-SNJ0730B.TOKELIBO,
+         PARA-(?HIDUKE,?JIKAN,?TOKCD,?KEKA)
+    /.##上位ＣＬに結果コードを渡す              ##./
+    ?JKEKA := ?KEKA
+    /.##異常終了メッセージを表示                ##./
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+    RETURN    PGMEC-?PGMEC
+
+/.##異常終了１##./
+ABEND1:
+
+    DEFLIBL   TOKELIB/TOKFLIB/TOKELIBO/TOKJLIB/TOKKLIB/ONLBLIB
+    /.##当日スケジュールマスタにエラーを更新する##./
+    CALL PGM-SNJ0730B.TOKELIBO,
+         PARA-(?HIDUKE,?JIKAN,?TOKCD,?KEKA)
+    /.##上位ＣＬに結果コードを渡す              ##./
+    ?MSGX :=  'ERR-CE = ' && %SBSTR(?PGMECX,8,4) && ' KEKA = ' &&
+               ?KEKA
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    ?JKEKA := ?KEKA
+    /.##異常終了メッセージを表示                ##./
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+    RETURN    PGMEC-?PGMEC
+
+/.##異常終了２　受領累積データ変換処理時、データ復元##./
+ABEND2:
+
+/.  CALL TWAIT.XUCL   ./
+    /.##バックアップデータを復元##./
+    SETPF FILE-KEIJYRF.BAKFLIB,TOFILE-KEIJYRF.TOKKLIB,
+          ADD-@NO,ACTCHK-@NO
+    IF  @PGMEC    ^=   0    THEN
+        ?KEKA := 'K619' /.## ABENDｺｰﾄﾞｾｯﾄ ##./
+    END
+    /.##当日スケジュールマスタにエラーを更新する##./
+    CALL PGM-SNJ0730B.TOKELIBO,
+         PARA-(?HIDUKE,?JIKAN,?TOKCD,?KEKA)
+    /.##上位ＣＬに結果コードを渡す              ##./
+    ?JKEKA := ?KEKA
+    /.##異常終了メッセージを表示                ##./
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+    RETURN    PGMEC-?PGMEC
+
+/.##異常終了３　受領返品データ変換処理時、データ復元##./
+ABEND3:
+
+/.  CALL TWAIT.XUCL  ./
+    /.##バックアップデータを復元##./
+    SETPF FILE-KEIJHRF.BAKFLIB,TOFILE-KEIJHRF.TOKKLIB,
+          ADD-@NO,ACTCHK-@NO
+    IF  @PGMEC    ^=   0    THEN
+        ?KEKA := 'K621' /.## ABENDｺｰﾄﾞｾｯﾄ ##./
+    END
+    /.##当日スケジュールマスタにエラーを更新する##./
+    CALL PGM-SNJ0730B.TOKELIBO,
+         PARA-(?HIDUKE,?JIKAN,?TOKCD,?KEKA)
+    /.##上位ＣＬに結果コードを渡す              ##./
+    ?JKEKA := ?KEKA
+    /.##異常終了メッセージを表示                ##./
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+    RETURN    PGMEC-?PGMEC
+

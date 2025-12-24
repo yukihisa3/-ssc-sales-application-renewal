@@ -1,0 +1,58 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    受配信サブシステム        　　　     *  ./
+/. *   JOB-ID      :    PNJ80000                             *  ./
+/. *   JOB-NAME    :    在庫引当／売上更新                   * ./
+/. *               :                                         *  ./
+/. ***********************************************************  ./
+/.###ﾜｰｸｴﾘｱ定義####./
+    PGM
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PNJ80000'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    DEFLIBL TOKELIB/TOKFLIB/TOKELIBO/TOKJLIB/TOKKLIB/TOKCLIBO
+
+/.##ＶＬＤ制御（在庫引当／売上更新）##./
+SNJ8000B:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+                                           /.##ﾌｧｲﾙ置換え##./
+    OVRF      FILE-JSMJIKL1,TOFILE-JSMJIKL1.TOKJLIB
+                                           /.##論理宛先置換え##./
+    OVRVLDF   FILE-VLD500,TOFILE-LD500.XUCL
+    CALL      PGM-SNJ8000B.TOKELIBO
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    END
+    DSPLOG CLR-@YES,EDT-@JEF
+
+    RETURN    PGMEC-@PGMEC
+

@@ -1,0 +1,110 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :                                         *  ./
+/. *   JOB-ID      :    CNI00100                             *  ./
+/. *   JOB-NAME    :    日次更新                             *  ./
+/. *               :    売上日次更新                         *  ./
+/. *               :    在庫日時更新を行う                   *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC  ,INTEGER
+    VAR       ?PGMECX ,STRING*11
+    VAR       ?PGMEM  ,STRING*99
+    VAR       ?MSG    ,STRING*99(6)
+    VAR       ?MSGX   ,STRING*99
+    VAR       ?PGMID  ,STRING*8,VALUE-'CNI00100'
+    VAR       ?STEP   ,STRING*8
+    VAR       ?WKSTN  ,STRING*8
+    VAR       ?JBNM   ,STRING*24!MIXED            /.業務漢字名 ./
+    VAR       ?JBID   ,STRING*10                  /.業務ＩＤ   ./
+    VAR       ?PGNM   ,STRING*24!MIXED            /.ＰＧ漢字名 ./
+    VAR       ?PGID   ,STRING*10                  /.ＰＧＩＤ　 ./
+    VAR       ?CHK    ,STRING*1,VALUE-'0'         /.ﾊﾟﾗﾒﾀﾁｪｯｸ./
+/.-----------------------------------------------------------./
+    VAR       ?CLID   ,STRING*8                   /.ＣＬＩＤ   ./
+    VAR       ?MSG1   ,STRING*80                  /.開始終了MSG./
+    VAR       ?OPR1   ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2   ,STRING*50                  /.      2    ./
+    VAR       ?OPR3   ,STRING*50                  /.      3    ./
+    VAR       ?OPR4   ,STRING*50                  /.      4    ./
+    VAR       ?OPR5   ,STRING*50                  /.      5    ./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.#################################################################./
+/.##売上／仕入／在庫計上データより実績累積Ｆ作成                 ##./
+/.#################################################################./
+/.##実績累積Ｆ作成##./
+STEP13:
+
+    ?STEP :=   'STEP13  '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '## 実績累積Ｆ　作成 ##'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-TOKU,TOFILE-TOKU.TOKWLIB
+    OVRF      FILE-RUISEKF,TOFILE-RUISEKL1.TOKFLIB
+    CALL      PGM-SJS0010B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##実績累積Ｆより、実績集計Ｆ集計                               ##./
+/.#################################################################./
+/.##実績集計ファイル作成                                        ./
+STEP14:
+    ?STEP :=   'STEP14  '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '## 実績集計Ｆ　集計 ##'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-RUISEKL2,TOFILE-RUISEKL2.TOKFLIB
+    OVRF      FILE-JISSYUL1,TOFILE-JISSYUL1.TOKFLIB
+    CALL      PGM-SJS0030B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##プログラム正常終了（資源の開放）                             ##./
+/.#################################################################./
+RTN:  /.資源の解放./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+/.#################################################################./
+/.##プログラム異常終了（資源の開放－＞ログリスト出力）           ##./
+/.#################################################################./
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    DMPWSLOG WKSTN-WKSTN001,FROM-@NEWACT
+
+    ?OPR1  :=  '　＃＃＃＃＃＃　日次更新異常終了　＃＃＃＃＃＃　　'
+    ?OPR2  :=  '　日次更新にて異常終了が発生しました。　　　　　　'
+    ?OPR3  :=  '　ログリストが出力されていますので，確認後，　　　'
+    ?OPR4  :=  '　_ナブ・アシストまで連絡して下さい。　　　　　　'
+    ?OPR5  :=  '　異常発生＊異常発生＊異常発生＊異常発生＊異常＊　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    RETURN    PGMEC-@PGMEC
+
+

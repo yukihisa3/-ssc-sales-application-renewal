@@ -1,0 +1,442 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    出荷検品システム                     *  ./
+/. *   JOB-ID      :    PKE50701                             *  ./
+/. *   JOB-NAME    :    (出荷検品）マスタデータ抽出          *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?FILNM    ,STRING*8,VALUE-'        '    /.ﾌｧｲﾙ名合併用./
+    VAR ?SNDF1    ,STRING*6,VALUE-'KNPTEN'      /.店舗ﾏｽﾀ./
+    VAR ?SNDK1    ,STRING*6,VALUE-'KNPTEK'      /.店舗ﾏｽﾀ件数./
+    VAR ?SNDF1H   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF1HN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF1K   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF1KN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF2    ,STRING*6,VALUE-'KNPSYO'      /.商品名称ﾏｽﾀ./
+    VAR ?SNDK2    ,STRING*6,VALUE-'KNPSYK'      /.商品名称ﾏｽﾀ件数./
+    VAR ?SNDF2H   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF2HN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF2K   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF2KN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF3    ,STRING*6,VALUE-'KNPTAN'      /.ﾛｹｰｼｮﾝﾏｽﾀ./
+    VAR ?SNDK3    ,STRING*6,VALUE-'KNPTAK'      /.ﾛｹｰｼｮﾝﾏｽﾀ件数./
+    VAR ?SNDF3H   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF3HN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF3K   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF3KN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF4    ,STRING*6,VALUE-'KNPKPG'      /.検品ｸﾞﾙｰﾌﾟﾏｽﾀ./
+    VAR ?SNDK4    ,STRING*6,VALUE-'KNPKPK'    /.検品ｸﾞﾙｰﾌﾟﾏｽﾀ件数./
+    VAR ?SNDF4H   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF4HN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF4K   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF4KN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF5    ,STRING*6,VALUE-'KNPKEN' /.倉庫別検品取引先ﾏｽﾀ./
+    VAR ?SNDK5    ,STRING*6,VALUE-'KNPKEK' /.倉庫別検品取引件数./
+    VAR ?SNDF5H   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF5HN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDF5K   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDF5KN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?LIBNM    ,STRING*8,VALUE-'TOKWLIB '    /.ﾗｲﾌﾞﾗﾘ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILID    ,NAME                         /.ﾌｧｲﾙ名名前型./
+    VAR ?LIBID    ,NAME                         /.ﾗｲﾌﾞﾗﾘ名名前型./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PKE50701'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?P1       ,STRING*1,VALUE-' '           /.店舗ﾏｽﾀ  ./
+    VAR ?P2       ,STRING*1,VALUE-' '            /.商品ﾏｽﾀ  ./
+    VAR ?P3       ,STRING*1,VALUE-' '           /.ﾛｹﾏｽﾀ./
+    VAR ?P4       ,STRING*1,VALUE-' '            /.検品ｸﾞﾙｰﾌﾟﾏｽﾀ./
+    VAR ?P5       ,STRING*1,VALUE-' '            /.倉庫別出荷取引先./
+    VAR ?P6       ,STRING*2,VALUE-'  '           /.実行倉庫ＣＤ./
+    VAR ?P7       ,STRING*2,VALUE-'  '           /.代表倉庫ＣＤ./
+    VAR ?M1       ,STRING*7,VALUE-'ﾃﾝﾎﾟﾏｽﾀ'     /.店舗ﾏｽﾀ  ./
+    VAR ?M2       ,STRING*10,VALUE-'ｼｮｳﾋﾝﾒｲｼｮｳ'  /.商品ﾏｽﾀ  ./
+    VAR ?M3       ,STRING*9,VALUE-'ﾛｹｰｼｮﾝﾏｽﾀ'   /.ﾛｹﾏｽﾀ./
+    VAR ?M4       ,STRING*11,VALUE-'ｹﾝﾋﾟﾝｸﾞﾙｰﾌﾟ' /.検品ｸﾞﾙｰﾌﾟﾏｽﾀ./
+    VAR ?M5       ,STRING*11,VALUE-'ｿｳｺﾍﾞﾂｹﾝﾋﾟﾝ' /.倉庫別出荷取引先./
+    VAR ?PGNM     ,STRING*40                     /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                     /.      2    ./
+    VAR ?KEKA2    ,STRING*40                     /.      3    ./
+    VAR ?KEKA3    ,STRING*40                     /.      4    ./
+    VAR ?KEKA4    ,STRING*40                     /.      5    ./
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKELIBO/TOKDTLIB
+
+/.##倉庫ｺｰﾄﾞ取得##./
+STEP000:
+
+    ?STEP :=   'STEP000 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?P6,?P7)
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4  :=  '【倉庫ＣＤ取得】'
+              GOTO ABEND
+    END
+
+/.##抽出ﾊﾟﾗﾒｰﾀ取得##./
+STEP010:
+
+    ?STEP :=   'STEP010 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-SKE5070I.TOKELIBO,PARA-(?P1,?P2,?P3,?P4,?P5)
+
+    IF        @PGMEC    ^=   0    THEN
+         IF   @PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              RETURN
+         ELSE
+              ?KEKA4  :=  '【抽出指示入力】'
+              GOTO ABEND
+         END
+    END
+
+/.##店舗ﾏｽﾀ抽出#./
+STEP020:
+
+    ?STEP :=   'STEP020 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    /.##店舗ﾏｽﾀ抽出選択の判定##./
+    IF   ?P1  = ' '  THEN
+          SNDMSG MSG-'## 店舗ﾏｽﾀ抽出 ｽｷｯﾌﾟ     ##',TO-XCTL
+          GOTO       STEP030
+    END
+    SNDMSG MSG-'## 店舗ﾏｽﾀ抽出 開始      ##',TO-XCTL
+
+    SNDMSG    ?M1,TO-XCTL
+    ?FILNM    :=    ?SNDF1 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF1H   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF1HN  :=    %STRING(?SNDF1H)
+    ?MSGX     :=    '## 店舗F      = ' && ?SNDF1HN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?SNDK1 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF1K   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF1KN  :=    %STRING(?SNDF1K)
+    ?MSGX     :=    '## 店舗件数F  = ' && ?SNDF1KN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF FILE-SOKKENL1,TOFILE-SOKKENL1.TOKFLIB
+    OVRF FILE-KNPTEN01,TOFILE-?SNDF1H
+    OVRF FILE-KNPTEK01,TOFILE-?SNDF1K
+    CALL      PGM-SKE5080B.TOKELIBO,PARA-(?P6)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【店舗マスタ抽出】'
+              GOTO ABEND
+    END
+    /.##店舗ﾏｽﾀ転送##./
+    FIMPORT FILE-?SNDF1H,PARA-SYUKAMST,UNIT-1
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【店舗マスタ送信】'
+              GOTO ABEND
+    END
+    /.##店舗ﾏｽﾀ件数転送##./
+    FIMPORT FILE-?SNDF1K,PARA-SYUKAMST,UNIT-2
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【店舗マスタ件数送信】'
+              GOTO ABEND
+    END
+    OVRF FILE-LBLTEN,TOFILE-LBLTEN.TOKKLIB
+    OVRF FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    CALL PGM-SKE8010B.TOKELIBO
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【ラベル用店舗マスタ抽出】'
+              GOTO ABEND
+    END
+    /.##店舗ﾏｽﾀ件数転送##./
+    FIMPORT FILE-LBLTEN.TOKKLIB,PARA-SYUKAMST,UNIT-11
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【店舗マスタ件数送信】'
+              GOTO ABEND
+    END
+
+/.##商品名称マスタ抽出##./
+STEP030:
+
+    ?STEP :=   'STEP030 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    /.##商品名称マスタ抽出選択の判定##./
+    IF   ?P2  = ' '  THEN
+          SNDMSG MSG-'## 商品名称ﾏｽﾀ ｽｷｯﾌﾟ     ##',TO-XCTL
+          GOTO       STEP040
+    END
+    /.##検品商品マスタ初期化##./
+    CLRFILE KNPSYOPF.TOKKLIB
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【検品商品マスタ初期化】'
+              GOTO ABEND
+    END
+    SNDMSG MSG-'## 商品名称ﾏｽﾀ 開始      ##',TO-XCTL
+
+    SNDMSG    ?M1,TO-XCTL
+    ?FILNM    :=    ?SNDF2 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF2H   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF2HN  :=    %STRING(?SNDF2H)
+    ?MSGX     :=    '## 商品名称F  = ' && ?SNDF2HN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?SNDK2 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF2K   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF2KN  :=    %STRING(?SNDF2K)
+    ?MSGX     :=    '## 商名件数F  = ' && ?SNDF2KN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF FILE-SOKKENL1,TOFILE-SOKKENL1.TOKFLIB
+    OVRF FILE-KNPSYOL1,TOFILE-KNPSYOL1.TOKKLIB
+    CALL      PGM-SKE5140B.TOKELIBO,PARA-(?P6)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【商品名称マスタ抽出】'
+              GOTO ABEND
+    END
+    /.##送信用商品データへコピー##./
+    CNVFILE FILE-KNPSYOPF.TOKKLIB,TOFILE-?SNDF2H,ADD-@NO,BF-24
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【商品名称Ｆ→送信用Ｆコピー】'
+              GOTO ABEND
+    END
+    OVRF FILE-KNPSYOF,TOFILE-?SNDF2H
+    OVRF FILE-KNPSYKF,TOFILE-?SNDF2K
+    CALL      PGM-SKE5141B.TOKELIBO
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【商品送信件数計算】'
+              GOTO ABEND
+    END
+    /.##商品名称ﾏｽﾀ転送##./
+    FIMPORT FILE-?SNDF2H,PARA-SYUKAMST,UNIT-3
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【商品名称マスタ送信】'
+              GOTO ABEND
+    END
+    /.##商品名称ﾏｽﾀ件数転送##./
+    FIMPORT FILE-?SNDF2K,PARA-SYUKAMST,UNIT-4
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【商品名称マスタ件数送信】'
+              GOTO ABEND
+    END
+
+/.##ロケーションマスタ抽出##./
+STEP040:
+
+    ?STEP :=   'STEP040 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    /.##ﾛｹｰｼｮﾝﾏｽﾀ抽出選択の判定##./
+    IF   ?P3  = ' '  THEN
+          SNDMSG MSG-'## ﾛｹｰｼｮﾝﾏｽﾀ   ｽｷｯﾌﾟ     ##',TO-XCTL
+          GOTO       STEP050
+    END
+    SNDMSG MSG-'## ﾛｹｰｼｮﾝﾏｽﾀ   　開始    ##',TO-XCTL
+
+    SNDMSG    ?M1,TO-XCTL
+    ?FILNM    :=    ?SNDF3 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF3H   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF3HN  :=    %STRING(?SNDF3H)
+    ?MSGX     :=    '## ﾛｹｰｼｭﾝF    = ' && ?SNDF3HN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?SNDK3 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF3K   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF3KN  :=    %STRING(?SNDF3K)
+    ?MSGX     :=    '## ﾛｹｰｼｮﾝ件数 = ' && ?SNDF3KN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF FILE-SHOTBL3,TOFILE-SHOTBL3.TOKFLIB
+    OVRF FILE-SOKKENL1,TOFILE-SOKKENL1.TOKFLIB
+    OVRF FILE-KNPTAN01,TOFILE-?SNDF3H
+    OVRF FILE-KNPTAK01,TOFILE-?SNDF3K
+    CALL      PGM-SKE5110B.TOKELIBO,PARA-(?P6)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【ロケーションマスタ抽出】'
+              GOTO ABEND
+    END
+    /.##ﾛｹｰｼｮﾝﾏｽﾀ転送##./
+    FIMPORT FILE-?SNDF3H,PARA-SYUKAMST,UNIT-5
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【ロケーションマスタ送信】'
+              GOTO ABEND
+    END
+    /.##ﾛｹｰｼｮﾝﾏｽﾀ件数転送##./
+    FIMPORT FILE-?SNDF3K,PARA-SYUKAMST,UNIT-6
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【ロケーションマスタ件数送信】'
+              GOTO ABEND
+    END
+
+/.##検品グループマスタ抽出##./
+STEP050:
+
+    ?STEP :=   'STEP050 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    /.##検品Ｇ抽出選択の判定##./
+    IF   ?P4  = ' '  THEN
+          SNDMSG MSG-'## 検品Ｇ      ｽｷｯﾌﾟ     ##',TO-XCTL
+          GOTO       STEP060
+    END
+    SNDMSG MSG-'## 検品Ｇ      　開始    ##',TO-XCTL
+
+    SNDMSG    ?M1,TO-XCTL
+    ?FILNM    :=    ?SNDF4 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF4H   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF4HN  :=    %STRING(?SNDF4H)
+    ?MSGX     :=    '## 検品Ｇ     = ' && ?SNDF4HN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?SNDK4 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF4K   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF4KN  :=    %STRING(?SNDF4K)
+    ?MSGX     :=    '## 検品Ｇ件数 = ' && ?SNDF4KN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF FILE-SHOTBL3,TOFILE-SHOTBL3.TOKFLIB
+    OVRF FILE-SOKKPGL1,TOFILE-SOKKPGL1.TOKFLIB
+    OVRF FILE-KNPKPG01,TOFILE-?SNDF4H
+    OVRF FILE-KNPKPK01,TOFILE-?SNDF4K
+    CALL      PGM-SKE5100B.TOKELIBO,PARA-(?P6)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【検品Ｇマスタ抽出】'
+              GOTO ABEND
+    END
+    /.##検品Gﾏｽﾀ転送##./
+    FIMPORT FILE-?SNDF4H,PARA-SYUKAMST,UNIT-7
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【検品Ｇマスタ送信】'
+              GOTO ABEND
+    END
+    /.##検品Gﾏｽﾀ件数転送##./
+    FIMPORT FILE-?SNDF4K,PARA-SYUKAMST,UNIT-8
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【検品Ｇマスタ件数送信】'
+              GOTO ABEND
+    END
+
+/.##倉庫別検品取引先Ｍ抽出##./
+STEP060:
+
+    ?STEP :=   'STEP060 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    /.##倉庫別検品取引先Ｍ抽出選択の判定##./
+    IF   ?P5  = ' '  THEN
+          SNDMSG MSG-'## 倉庫別検品取引先Mｽｷｯﾌﾟ##',TO-XCTL
+          GOTO       RTN
+    END
+    SNDMSG MSG-'## 倉庫別検品取引先M開始 ##',TO-XCTL
+
+    SNDMSG    ?M1,TO-XCTL
+    ?FILNM    :=    ?SNDF5 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF5H   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF5HN  :=    %STRING(?SNDF5H)
+    ?MSGX     :=    '## 倉検取F    = ' && ?SNDF5HN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?SNDK5 && ?P6
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?SNDF5K   :=    %NCAT(?FILID,?LIBID)
+    ?SNDF5KN  :=    %STRING(?SNDF5K)
+    ?MSGX     :=    '## 倉検取件数F= ' && ?SNDF5KN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF FILE-SOKKENL1,TOFILE-SOKKENL1.TOKFLIB
+    OVRF FILE-KNPKEN01,TOFILE-?SNDF5H
+    OVRF FILE-KNPKEK01,TOFILE-?SNDF5K
+    CALL      PGM-SKE5090B.TOKELIBO,PARA-(?P6)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【倉庫別検品取引先マスタ抽出】'
+              GOTO ABEND
+    END
+    /.##倉庫別検品取引先ﾏｽﾀ転送##./
+    FIMPORT FILE-?SNDF5H,PARA-SYUKAMST,UNIT-9
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【倉庫別検品取引先マスタ送信】'
+              GOTO ABEND
+    END
+    /.##倉庫別検品取引先ﾏｽﾀ件数転送##./
+    FIMPORT FILE-?SNDF5K,PARA-SYUKAMST,UNIT-10
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【倉庫別検品取引先マスタ件数送信】'
+              GOTO ABEND
+    END
+
+
+RTN:
+
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    ?KEKA1 :=  '出荷検品用マスタデータ抽出処理が正常終了'
+    ?KEKA2 :=  'しました。出荷検品システム側で取込処理を'
+    ?KEKA3 :=  '行なって下さい。'
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+
+ABEND:
+
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    ?KEKA1 :=  '出荷検品用マスタデータ抽出処理が異常終了'
+    ?KEKA2 :=  'しました。ログ採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

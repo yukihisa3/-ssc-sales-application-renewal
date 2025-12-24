@@ -1,0 +1,76 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム                          *  ./
+/. *   SYSTEM-NAME :                                         *  ./
+/. *   JOB-ID      :    PYP00200                             *  ./
+/. *   JOB-NAME    :    ユポラベル出力（消費税総額対応）     *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PYP00200'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?WKSTN    ,STRING*8
+    VAR       ?NWKSTN   ,NAME
+    VAR       ?OPR1     ,STRING*50                /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                /.      2    ./
+    VAR       ?OPR3     ,STRING*50                /.      3    ./
+    VAR       ?OPR4     ,STRING*50                /.      4    ./
+    VAR       ?OPR5     ,STRING*50                /.      5    ./
+    ?NWKSTN   :=        @ORGWS
+    ?WKSTN    :=        %STRING(?NWKSTN)
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB
+
+/.##ユポラベル出力##./
+SYP0020L:
+
+    ?STEP :=   'SYP0020L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-NYUPOL1,TOFILE-NYUPOL1.TOKFLIB
+    OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIB
+    CALL      PGM-SYP0020L.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+    ?OPR1  :=  '入力されているユポラベルデータの削除を行ないます。'
+    ?OPR2  :=  '確認して下さい。'
+    ?OPR3  :=  ''
+    ?OPR4  :=  '削除ＯＫの場合⇒ＥＮＴＥＲを押して下さい。'
+    ?OPR5  :=  '削除ＮＧの場合⇒ＰＦ９（Ｆ９）を押して下さい。'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+    /.##ユポラベルデータ削除##./
+    CLRFILE   FILE-NYUPOF.TOKFLIB
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

@@ -1,0 +1,177 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    Ｄ３６５連携　　　　　　  　　　     *  ./
+/. *   JOB-ID      :    PZT00101                             *  ./
+/. *   JOB-NAME    :    在庫調整データ取込＆更新     　　　 *  ./
+/. *               :                                         *  ./
+/. ***********************************************************  ./
+/.###ﾊﾟﾗﾒﾀ 定義####./
+    PGM (P1-?SIJI,P2-?SRKBN,P3-?JSKBN,P4-?DTKBN,P5-?SIJIDT,
+         P6-?SIJITM,P7-?NKFILE,P8-?NKLIB,P9-?BUTAN,P10-?JKEKA)
+  /.ﾊﾟﾗﾒﾀﾜｰｸ./
+    PARA ?SIJI    ,STRING*10,IN,VALUE-'          '  /. 指示NO./
+    PARA ?SRKBN   ,STRING*1,IN,VALUE-' '            /. 送受信./
+    PARA ?JSKBN   ,STRING*1,IN,VALUE-' '            /. 自動手動./
+    PARA ?DTKBN   ,STRING*2,IN,VALUE-'  '           /. ＤＴ種別./
+    PARA ?SIJIDT  ,STRING*8,IN,VALUE-'        '     /. 日付./
+    PARA ?SIJITM  ,STRING*6,IN,VALUE-'      '       /. 時刻./
+    PARA ?NKFILE  ,STRING*8,IN,VALUE-'        '     /. ファイル名./
+    PARA ?NKLIB   ,STRING*8,IN,VALUE-'        '     /. ＬＩＢ名./
+    PARA ?BUTAN   ,STRING*6,IN,VALUE-'      '       /. 部門＋担当者./
+    PARA ?JKEKA   ,STRING*4,OUT,VALUE-'    '        /. 結果./
+/.###ﾜｰｸｴﾘｱ定義###./
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PZT00101'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1./
+    VAR ?KEKA1    ,STRING*40                    /.      2./
+    VAR ?KEKA2    ,STRING*40                    /.      3./
+    VAR ?KEKA3    ,STRING*40                    /.      4./
+    VAR ?KEKA4    ,STRING*40                    /.      5./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門名./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+/.###出力パラメタ###./
+    VAR ?OUTCNT1  ,STRING*7,VALUE-'0000000'    /.件数(全)./
+    VAR ?OUTCNT2  ,STRING*7,VALUE-'0000000'    /.件数(OK)./
+    VAR ?OUTCNT3  ,STRING*7,VALUE-'0000000'    /.件数(NG)./
+    VAR ?TRDATE   ,STRING*8,VALUE-'00000000'   /.実行日付./
+    VAR ?TRTIME   ,STRING*8,VALUE-'00000000'   /.実行時刻./
+    VAR       ?FILNM    ,STRING*8,VALUE-'        '
+    VAR       ?LIBNM    ,STRING*8,VALUE-'        '
+    VAR       ?FILID    ,NAME
+    VAR       ?LIBID    ,NAME
+    VAR       ?D365NYK  ,NAME!MOD
+    VAR       ?D365NYKW ,STRING*17,VALUE-'                 '
+    VAR       ?OPR1   ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2   ,STRING*50                  /.      2    ./
+    VAR       ?OPR3   ,STRING*50                  /.      3    ./
+    VAR       ?OPR4   ,STRING*50                  /.      4    ./
+    VAR       ?OPR5   ,STRING*50                  /.      5    ./
+
+/.###ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL D365DLIB/TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO/TOKDTLIB
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '在庫調整データ取込＆更新'
+
+/.##ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.##受信データバックアップ##./
+STEP010:
+
+    CNVFILE FILE-RCVZAIF9.D365DLIB,TOFILE-RCVZAIFA.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZAIF8.D365DLIB,TOFILE-RCVZAIF9.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZAIF7.D365DLIB,TOFILE-RCVZAIF8.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZAIF6.D365DLIB,TOFILE-RCVZAIF7.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZAIF5.D365DLIB,TOFILE-RCVZAIF6.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZAIF4.D365DLIB,TOFILE-RCVZAIF5.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZAIF3.D365DLIB,TOFILE-RCVZAIF4.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZAIF2.D365DLIB,TOFILE-RCVZAIF3.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZAIF1.D365DLIB,TOFILE-RCVZAIF2.D365DLIB,
+            ADD-@NO,BF-20
+    CNVFILE FILE-RCVZATF.D365DLIB,TOFILE-RCVZAIF1.D365DLIB,
+            ADD-@NO,BF-20
+
+/.##移動依頼実績データ作成##./
+NZT0010B:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CALL PGM-NZT0010B.TOKSOLIB,PARA-(?OUTCNT1,?OUTCNT2,?OUTCNT3,
+                                     ?TRDATE,?TRTIME)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '移動依頼実績データ作成'
+              GOTO ABEND
+    ELSE
+              ?MSGX :=  '*取込件数(ALL) = ' && ?OUTCNT1 && ' *'
+              SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+              ?MSGX :=  '*取込件数(OK ) = ' && ?OUTCNT2 && ' *'
+              SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+              ?MSGX :=  '*取込件数(NG ) = ' && ?OUTCNT3 && ' *'
+              SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+              ?MSGX :=  '*取込日付      = ' && ?TRDATE  && ' *'
+              SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+              ?MSGX :=  '*取込時刻      = ' && ?TRTIME  && ' *'
+              SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+
+/.##移動依頼実績リスト発行(エラー分)##./
+NZT0030L:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CALL PGM-NZT0030L.TOKSOLIB,PARA-(?TRDATE,?TRDATE,?TRTIME,
+                                     ?TRTIME,'1')
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '移動依頼実績リスト発行'
+              GOTO ABEND
+    END
+
+
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+RTN:
+
+    /.##正常の場合受信Ｆ削除##./
+    CLRFILE FILE-RCVZATF.D365DLIB
+
+    ?KEKA1 :=  '在庫調整データ取込＆更新'
+    ?KEKA2 :=  '処理が正常終了しました。'
+    ?KEKA3 :=  '取込内容を確認してください'
+    OVRPRTF FILE-PRTF,TOFILE-PRTF.TOKELIB,MEDLIB-TOKMDLIB
+    CALL SMG0040L.TOKSOLIB,
+         PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+    ?KEKA1 :=  '在庫調整データ取込＆更新'
+    ?KEKA2 :=  '処理が異常終了しました。'
+    ?KEKA3 :=  'ログ採取し，ＮＡＶへ連絡して下さい。'
+    OVRPRTF FILE-PRTF,TOFILE-PRTF.TOKELIB,MEDLIB-TOKMDLIB
+    CALL SMG0040L.TOKSOLIB,
+         PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO ?MSGX :=   ?MSG(?I)
+           SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+
+    RETURN    PGMEC-@PGMEC
+

@@ -1,0 +1,117 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　新基幹システム                        *  ./
+/. *   SYSTEM-NAME :    在庫管理システム                     *  ./
+/. *   JOB-ID      :    PFU00300                             *  ./
+/. *   JOB-NAME    :    振替依頼リスト出力                   *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PFU00300'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?SOKO     ,STRING*2
+    VAR       ?DSOKO    ,STRING*2
+    VAR       ?OSOKO    ,STRING*2
+    VAR       ?WKSTN    ,STRING*8
+    VAR       ?NWKSTN   ,NAME
+    VAR       ?OPR1     ,STRING*50               /.ﾒｯｾｰｼﾞ1   ./
+    VAR       ?OPR2     ,STRING*50               /.      2   ./
+    VAR       ?OPR3     ,STRING*50               /.      3   ./
+    VAR       ?OPR4     ,STRING*50               /.      4   ./
+    VAR       ?OPR5     ,STRING*50               /.      5   ./
+    ?NWKSTN   :=         @ORGWS
+    ?WKSTN    :=         %STRING(?NWKSTN)
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DEFLIBL   TOKFLIB/TOKELIB
+
+/.  営業所送信データセット  ./
+
+    SETPF FILE-FUIRAISF.TOKFLIB,TOFILE-FUIRAIF.TOKFLIB,
+          ACTCHK-@NO
+
+/.  倉庫ＣＤ取得                                              ./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WKSTN,?SOKO,?DSOKO)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.  振替依頼リスト                                            ./
+SFU0030L:
+
+    ?STEP :=   'SFU0030L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-FUIRAIL1,TOFILE-FUIRAIL1.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    CALL      PGM-SFU0030L.TOKELIB,PARA-(?SOKO,?DSOKO,?OSOKO)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+
+/.##振替依頼データ削除##./
+
+    ?OPR1  :=  '　＃＃＃＃＃　振替依頼データ削除処理　＃＃＃＃＃　'
+    ?OPR2  :=  '　　営業所からの振替依頼データを削除します。'
+    ?OPR3  :=  '　　振替依頼リストは出力されましたか。'
+    ?OPR4  :=  '　　確認して下さい。'
+    ?OPR5  :=  '　＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    CLRFILE FILE-FUIRAISF.TOKFLIB
+
+/.  振替依頼データ削除                                        ./
+SFU0050B:
+
+    ?STEP :=   'SFU0050B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-FUIRAIL1,TOFILE-FUIRAIL1.TOKFLIB
+    CALL      PGM-SFU0050B.TOKELIB,PARA-(?OSOKO)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

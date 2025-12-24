@@ -1,0 +1,116 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    マスタメンテ                         *  ./
+/. *   JOB-ID      :    PIT00100                             *  ./
+/. *   JOB-NAME    :    ログイン管理マスタ保守               *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PIT00100'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '     /.部門名./
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '       /.担当者CD./
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR       ?STDATE   ,STRING*8,VALUE-'        ' /.連携日付./
+    VAR       ?STTIME   ,STRING*6,VALUE-'      '   /.連携時刻./
+    VAR       ?EDDATE   ,STRING*8,VALUE-'        ' /.連携日付./
+    VAR       ?EDTIME   ,STRING*6,VALUE-'      '   /.連携時刻./
+    VAR       ?P01      ,STRING*6,VALUE-'      '   /.担当者ﾏｽﾀﾊﾟﾗ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##ログインユーザー情報取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+
+/.##ログイン管理マスタ保守##./
+SIT0010I:
+
+    ?STEP :=   'SIT0010I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF  FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF     FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF     FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF     FILE-JHMLOGL1,TOFILE-JHMLOGL1.TOKKLIB
+    CALL PGM-SIT0010I.TOKELIBO ,PARA-(?BUMON,?TANCD,?STDATE,?STTIME)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+    ?EDDATE := ?STDATE
+    ?EDTIME := ?STTIME
+
+/.##ログイン管理マスタリスト出力##./
+SIT0025L:
+
+    ?STEP :=   'SIT0025L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##本社ﾚｰｻﾞｰへ出力##./
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+    OVRF     FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF     FILE-MSTLOGL3,TOFILE-MSTLOGL3.TOKKLIB
+/.  CALL PGM-SIT0025L.TOKELIBO ,PARA-(?BUMON,?TANCD,?STDATE,?STTIME,
+./  CALL PGM-SIT0026L.TOKSOLIB,PARA-(?BUMON,?TANCD,?STDATE,?STTIME,
+                                      ?EDDATE,?EDTIME)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

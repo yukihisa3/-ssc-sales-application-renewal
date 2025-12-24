@@ -1,0 +1,353 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　本社システム　　　　　　　　          *  ./
+/. *   SYSTEM-NAME :    ＨＧ基幹システム　　　　　　　　　   *  ./
+/. *   JOB-ID      :    PBT10200                             *  ./
+/. *   JOB-NAME    :    ナフコ出荷データ抽出　　　　　　　   *  ./
+/. *   UPDATE      :                                         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS      ,STRING*08,VALUE-'        '      /.ﾜｰｸｽﾃｰｼｮﾝ文字  ./
+    VAR ?BUMON   ,STRING*04,VALUE-'    '          /.部門名       ./
+    VAR ?TANCD6  ,STRING*06,VALUE-'      '        /.担当者CDWK   ./
+    VAR ?TANCD   ,STRING*02,VALUE-'  '            /.担当者CD     ./
+    VAR ?TANNO   ,STRING*03,VALUE-'   '           /.端末番号./
+  /.VAR ?SOUKO   ,STRING*02,VALUE-'  './          /.倉庫コード     ./
+    VAR ?DSOUKO  ,STRING*02,VALUE-'  '            /.代表倉庫コード ./
+    VAR ?WKSTN   ,NAME                            /.ﾜｰｸｽﾃｰｼｮﾝ名前  ./
+    VAR ?PGMEC   ,INTEGER                         /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ ./
+    VAR ?PGMECX  ,STRING*11                       /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ    ./
+    VAR ?PGMEM   ,STRING*99                       /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ  ./
+    VAR ?MSG     ,STRING*99(6)                    /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX    ,STRING*99                         /.SNDMSG表示用 ./
+    VAR ?CLID    ,STRING*08,VALUE-'PBT10200'        /.CLID         ./
+    VAR ?STEP    ,STRING*08                         /.STEP-ID      ./
+    VAR ?CLNM    ,STRING*40                         /.CL名称       ./
+    VAR ?KEKA1   ,STRING*40                         /.ﾒｯｾｰｼﾞ1      ./
+    VAR ?KEKA2   ,STRING*40                         /.ﾒｯｾｰｼﾞ2      ./
+    VAR ?KEKA3   ,STRING*40                         /.ﾒｯｾｰｼﾞ3      ./
+    VAR ?KEKA4   ,STRING*40                         /.ﾒｯｾｰｼﾞ4      ./
+    VAR ?OPR1    ,STRING*50                         /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?OPR2    ,STRING*50                         /.      2    ./
+    VAR ?OPR3    ,STRING*50                         /.      3    ./
+    VAR ?OPR4    ,STRING*50                         /.      4    ./
+    VAR ?OPR5    ,STRING*50                         /.      5    ./
+
+   /.##パラメタ（個別）##./
+    /.抽出件数情報./
+    VAR ?KANRI   ,STRING*08,VALUE-'00000000'  /.管理番号./
+    VAR ?SOUKO   ,STRING*02,VALUE-'  '        /.倉庫コード./
+    VAR ?CYUKBN  ,STRING*01,VALUE-' '         /.抽出区分./
+    VAR ?KENSUU1 ,STRING*08,VALUE-'00000000'  /.　件数1./
+    VAR ?KENSUU2 ,STRING*08,VALUE-'00000000'  /.　件数2./
+    VAR ?KENSUU3 ,STRING*08,VALUE-'00000000'  /.　件数3./
+    VAR ?KENSUU4 ,STRING*08,VALUE-'00000000'  /.　件数4./
+    VAR ?KENSUU5 ,STRING*08,VALUE-'00000000'  /.　件数5./
+
+/.------------------------------------------------------------------./
+
+/.##実行PG名称ｾｯﾄ##./
+    ?CLNM := 'ナフコ出荷データ抽出　　　　　　　　　'
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB/TOKDLIB/TOKKLIB/BMSFLIB
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?CLID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##実行確認##./
+/.  ?OPR1  :=  ''
+    ?OPR2  :=  '　　ナフコ出荷データ抽出を行います。'
+    ?OPR3  :=  ''
+    ?OPR4  :=  '　　　　　　続行しますか？'
+    ?OPR5  :=  ''
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)./
+
+/.##ログインユーザー情報取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD6)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ログイン情報取得'
+              GOTO ABEND
+    END
+    ?TANCD := %SBSTR(?TANCD6,1,2)
+
+/.##端末番号を取得##./
+SBT0620B:
+
+    ?STEP :=   'SBT0620B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-SBT0620B.TOKELIBO,PARA-(?WS,?TANNO)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '端末番号取得'
+              GOTO ABEND END
+    ?MSGX := '## 端末NO = ' && ?TANNO
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##倉庫コード取得##./
+SKY1601B:
+  /.
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,
+                  PARA-(?WS,?SOUKO,?DSOUKO)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '倉庫コード取得'
+              GOTO ABEND
+    END                           ./
+  /.SNDMSG    'WS=',TO-XCTL
+    SNDMSG    ?WS,TO-XCTL
+    SNDMSG    'SOUKO=',TO-XCTL
+    SNDMSG    ?SOUKO,TO-XCTL
+    SNDMSG    'DSOUKO=',TO-XCTL
+    SNDMSG    ?DSOUKO,TO-XCTL   ./
+
+/.##ナフコ出荷データロック##./
+ASSIGN:
+
+    ?STEP :=   'ASSIGN'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ASSIGN    FILE-NFKGTRF.TOKDLIB!@XCL
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              SNDMSG '他で抽出処理が行われています',TOWS-@ORGWS
+              ?KEKA4 :=  'ナフコ出荷データロック'
+              GOTO ABEND
+    END
+
+    ASSIGN    FILE-NFSYUKA.TOKDLIB!@XCL
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              SNDMSG '他で抽出処理が行われています',TOWS-@ORGWS
+              ?KEKA4 :=  'ナフコ出荷データロック'
+              GOTO ABEND
+    END
+
+/.##ナフコ出荷データ抽出指示##./
+SBT1020I:
+
+    ?STEP :=   'SBT1020I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIBO
+    CALL      PGM-SBT1020I.TOKELIBO,
+              PARA-(?KANRI,?SOUKO,?CYUKBN)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0   THEN
+         IF   ?PGMEC     =   4010 THEN
+              RELEASE   BFKGTRF.TOKDLIB!@XCL
+              RELEASE   NFSYUKA.TOKDLIB!@XCL
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              ?MSGX :=  '***   '  && ?CLID  &&   ' END    ***'
+              SNDMSG    ?MSGX,TO-XCTL
+              RETURN
+         ELSE
+              ?KEKA4 :=  'ナフコ出荷データ抽出指示'
+              GOTO ABEND
+         END
+    END
+
+    ?MSGX := '# 管理番号　　 = ' && ?KANRI  && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX := '# 倉庫ＣＤ　　 = ' && ?SOUKO  && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX := '# 抽出区分　　 = ' && ?CYUKBN && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    IF        ?CYUKBN   =   '4'    THEN
+              GOTO      SBT1040B
+    END
+
+/.##ナフコ箱トレーデータ抽出##./
+SBT1030B:
+
+    ?STEP :=   'SBT1030B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-SBT1030B.TOKELIBO
+             ,PARA-(?KANRI,?SOUKO,?CYUKBN,?KENSUU1,?KENSUU2,?KENSUU3)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+  /.IF        ?PGMEC     =  4001  THEN
+              SNDMSG '＊＊＊＊＊＊＊＊＊＊＊＊',TO-XCTL
+              SNDMSG '＊　この指定条件では　＊',TO-XCTL
+              SNDMSG '＊　抽出対象データが　＊',TO-XCTL
+              SNDMSG '＊　ありません！　　　＊',TO-XCTL
+              SNDMSG '＊＊＊＊＊＊＊＊＊＊＊＊',TO-XCTL
+              RETURN    PGMEC-@PGMEC
+    END                               ./
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ナフコ箱トレーデータ抽出'
+              GOTO ABEND
+    END
+    ?MSGX := '# 抽出件数１　 = ' && ?KENSUU1 && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX := '# 抽出件数２　 = ' && ?KENSUU2 && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX := '# 抽出件数３　 = ' && ?KENSUU3 && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+    GOTO      FIMPORT1
+
+/.##ナフコ出荷明細データ抽出##./
+SBT1040B:
+
+    ?STEP :=   'SBT1040B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-SBT1040B.TOKELIBO
+             ,PARA-(?KANRI,?SOUKO,?CYUKBN,?KENSUU4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+  /.IF        ?PGMEC     =  4001  THEN
+              SNDMSG '＊＊＊＊＊＊＊＊＊＊＊＊',TO-XCTL
+              SNDMSG '＊　この指定条件では　＊',TO-XCTL
+              SNDMSG '＊　抽出対象データが　＊',TO-XCTL
+              SNDMSG '＊　ありません！　　　＊',TO-XCTL
+              SNDMSG '＊＊＊＊＊＊＊＊＊＊＊＊',TO-XCTL
+              RETURN    PGMEC-@PGMEC
+    END                               ./
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ナフコ出荷明細データ抽出'
+              GOTO ABEND
+    END
+    ?MSGX := '# 抽出件数４　 = ' && ?KENSUU4 && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+    GOTO      FIMPORT2
+
+/.##データ転送##./
+FIMPORT1:
+
+    ?STEP :=   'FIMPORT1'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    FIMPORT   FILE-NFKGTRF.TOKDLIB,TYPE-@FILE,
+              PARA-AMGLINKS,UNIT-2,OPR-@NO
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ナフコ個口トレー数データ転送'
+              GOTO ABEND
+    END
+    GOTO      SBT1050L
+
+FIMPORT2:
+
+    ?STEP :=   'FIMPORT2'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    FIMPORT   FILE-NFSYUKA.TOKDLIB,TYPE-@FILE,
+              PARA-AMGLINKS,UNIT-3,OPR-@NO
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ナフコ植物出荷数データ転送'
+              GOTO ABEND
+    END
+
+/.##ＬＩＮＫＳ連携リスト出力##./
+SBT1050L:
+
+    ?STEP :=   'SBT1050L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.  CASE      ?CYUKBN   OF
+       #'1'#  ?CYUKBN   :=   '2'
+              ?KENSUU2  :=   ?KENSUU1
+              ?KENSUU1  :=   '00000000'
+       #'2'#  ?CYUKBN   :=   '3'
+              ?KENSUU3  :=   ?KENSUU2
+       #'3'#  ?CYUKBN   :=   '4'
+              ?KENSUU4  :=   ?KENSUU3
+       #'4'#  ?CYUKBN   :=   '5'
+              ?KENSUU5  :=   ?KENSUU4
+    END
+./
+/.  OVRF      FILE-PRTF,TOFILE-PRTF.TOKELIB
+./  OVRPRTF FILE-XU04LP,TOFILE-LBPPRTE1.TOKELIBO,MEDLIB-TOKELIBO
+    CALL      PGM-SBT1050L.TOKELIBO
+                 ,PARA-(?BUMON,
+                        ?TANCD,
+                        ?CYUKBN,
+                        ?SOUKO,
+                        ?KENSUU5,
+                        ?KENSUU1,
+                        ?KENSUU2,
+                        ?KENSUU3,
+                        ?KENSUU4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ＬＩＮＫＳ連携結果リスト出力'
+              GOTO ABEND
+    END
+
+/.##正常終了処理##./
+RTN:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  ''
+    ?KEKA3 :=  '　【ナフコ出荷データ抽出】'
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?CLNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?CLID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+/.------------------------------------------------------------------./
+
+/.##異常終了処理##./
+ABEND:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリストを採取後、ＮＡＶへ連絡'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?CLNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?CLID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

@@ -1,0 +1,196 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    ＳＯＳ処理　　　　        　　　     *  ./
+/. *   JOB-ID      :    POS07100                             *  ./
+/. *   JOB-NAME    :    北海道丸日データ削除                 * ./
+/. *               :                                         *  ./
+/. ***********************************************************  ./
+/.###ﾜｰｸｴﾘｱ定義####./
+    PGM
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'POS07100'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    VAR ?HIDUKE   ,STRING*8,VALUE-'        '    /.ﾊﾞｯﾁNO.:ﾋﾂﾞｹ./
+    VAR ?JIKAN    ,STRING*4,VALUE-'    '        /.ﾊﾞｯﾁNO.:ｼﾞｶﾝ./
+    VAR ?TORCD    ,STRING*8,VALUE-'        '    /.ﾊﾞｯﾁNO.:ﾄﾘﾋｷｻｷ./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '丸日累積データ削除処理'
+
+/.##日付入力画面##./
+SOS0710I:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    CALL      PGM-SOS0710I.TOKELIB,PARA-(?HIDUKE)
+    IF        @PGMEC    ^=   0    THEN
+              IF  @PGMEC = 4010   THEN
+                  ?MSGX := '##取消終了##'
+                  SNDMSG ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+                  RETURN
+              ELSE
+                  ?KEKA4 :=  '【日付入力】'
+                  GOTO ABEND
+              END
+    END
+
+    ?MSGX :=  '＃＃削除基準日＝' &&  ?HIDUKE && '　＃＃'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##丸日累積ＤＴ前回分削除##./
+PBACKUP1:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    DLTFILE FILE-MARRUIBK.TOKWLIB
+    IF        @PGMEC    ^=   0    THEN
+               ?KEKA4 :=  '【前回バックアップ分削除】'
+               GOTO ABEND
+    END
+
+/.##丸日累積ＤＴバックアップ##./
+PBACKUP2:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    CPYFILE FILE-MARRUIF.TOKFLIB,TOFILE-MARRUIBK.TOKWLIB,
+            CRTFILE-@YES
+    IF        @PGMEC    ^=   0    THEN
+               ?KEKA4 :=  '【丸日累積ＤＴバックアップ】'
+               GOTO ABEND
+    END
+
+/.##丸日累積データ削除##./
+SMADEL:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-MARRUIL1,TOFILE-MARRUIL1.TOKFLIB
+    CALL      PGM-SMADEL.TOKELIB,PARA-(?HIDUKE)
+    IF        @PGMEC    ^=   0    THEN
+               ?KEKA4 :=  '【重複チェック処理】'
+               GOTO ABEND
+    END
+
+/.##ファイル切り離し１##./
+PDACTLF1:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    DACTLF FILE-MARRUIL1.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+               ?KEKA4 :=  '【論理Ｆ切り離し（ＬＦ１）】'
+               GOTO ABEND
+    END
+
+/.##ファイル切り離し２##./
+PDACTLF2:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    DACTLF FILE-MARRUIL2.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+               ?KEKA4 :=  '【論理Ｆ切り離し（ＬＦ２）】'
+               GOTO ABEND
+    END
+
+/.##ファイル切り離し２##./
+PCNDPF:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    CNDPF FILE-MARRUIF.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+               ?KEKA4 :=  '【物理Ｆ圧縮】'
+               GOTO ABEND
+    END
+
+/.##ファイル関連付け１##./
+PACTLF1:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    ACTLF FILE-MARRUIL1.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+               ?KEKA4 :=  '【論理Ｆ関連付け（ＬＦ１）】'
+               GOTO ABEND
+    END
+
+/.##ファイル関連付け２##./
+PACTLF2:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    ACTLF FILE-MARRUIL2.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+               ?KEKA4 :=  '【論理Ｆ関連付け（ＬＦ２）】'
+               GOTO ABEND
+    END
+
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+RTN:
+
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  '再伝票更新処理を実行して下さい。'
+    ?KEKA3 :=  ''
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    END
+    DSPLOG CLR-@YES,EDT-@JEF
+
+    RETURN    PGMEC-@PGMEC
+

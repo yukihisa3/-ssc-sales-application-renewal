@@ -1,0 +1,285 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　ＩＴ統制　　　　　　　　　　          *  ./
+/. *   SYSTEM-NAME :    マスタ更新履歴プルーフ               *  ./
+/. *   JOB-ID      :    PIT01900  2009/03/23 - 03/26         *  ./
+/. *   JOB-NAME    :    マスタ更新履歴出力指示               *  ./
+/. *   UPDATE      :    2019.03.18                           *  ./
+/. *                     S11300660 マスタリスト改善          *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PIT01900'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '     /.部門CD./
+    VAR       ?TANCD    ,STRING*8,VALUE-'        ' /.担当者./
+    VAR       ?SOUSASYU ,STRING*1,VALUE-' '        /.操作種別./
+    VAR       ?TANST    ,STRING*8,VALUE-'        ' /.担当者CD./
+    VAR       ?MKUBUN   ,STRING*2,VALUE-'  '       /.マスタ区分./
+    VAR       ?NYUST    ,STRING*8,VALUE-'        ' /.更新開始日./
+    VAR       ?NYUED    ,STRING*8,VALUE-'        ' /.更新終了日./
+    VAR       ?STIME    ,STRING*6,VALUE-'000000'   /.時刻./
+    VAR       ?ETIME    ,STRING*6,VALUE-'999999'   /.時刻./
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR       ?P1       ,STRING*34                 /.帳票出力ﾊﾟﾗﾒﾀ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##部門ｺｰﾄﾞ取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+
+
+/.##画面範囲指定##./
+SIT0190I:
+
+    ?STEP :=   'SIT0190I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    CALL      PGM-SIT0190I.TOKELIBO,PARA-(?BUMON,?TANCD,
+                   ?SOUSASYU,?TANST,?MKUBUN,?NYUST,?NYUED)
+    IF        @PGMEC    ^=   0  THEN
+              IF  @PGMEC = 4010  THEN
+                  SNDMSG MSG-'##取消終了##',TO-XCTL
+                  RETURN
+              ELSE
+                  GOTO  ABEND
+              END
+    END
+
+/.##各マスタリスト##./
+
+/.##本社ﾚｰｻﾞｰへ出力##./
+/.  IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE   ./
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+/.  END  ./
+    IF ?MKUBUN = '01'  THEN
+     /. 2019.03.18       ./
+     /.GOTO    SIT0040L  ./
+       GOTO    SIT0042L
+    END
+    IF ?MKUBUN = '02'  THEN
+     /. 2019.03.18       ./
+     /.GOTO    SIT0060L  ./
+       GOTO    SIT0061L
+    END
+    IF ?MKUBUN = '03'  THEN
+     /. 2019.03.18       ./
+     /.GOTO    SIT0080L  ./
+       GOTO    SIT0082L
+    END
+    IF ?MKUBUN = '04'  THEN
+     /. 2019.03.18       ./
+     /.GOTO    SIT0100L  ./
+       GOTO    SIT0102L
+    END
+    IF ?MKUBUN = '05'  THEN
+     /. 2019.03.18       ./
+     /.GOTO    SIT0120L  ./
+       GOTO    SIT0121L
+    END
+    IF ?MKUBUN = '06'  THEN
+       GOTO    SIT0140L
+    END
+    IF ?MKUBUN = '07'  THEN
+     /. 2019.03.18       ./
+     /.GOTO    SIT0160L  ./
+       GOTO    SIT0161L
+    END
+    IF ?MKUBUN = '08'  THEN
+     /. 2019.03.18       ./
+     /.GOTO    SIT0180L  ./
+       GOTO    SIT0181L
+    END
+    IF ?MKUBUN = '09'  THEN
+     /. 2019.03.18       ./
+     /.GOTO    SIT0025L  ./
+       GOTO    SIT0026L
+    END
+
+    GOTO  ABEND
+SIT0042L:
+    ?STEP :=   'SIT0042L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+  /. 2019.03.18 ./
+  /.CALL PGM-SIT0041L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)    ./
+    CALL PGM-SIT0042L.TOKSOLIB,PARA-(?BUMON,?TANST,?NYUST,?NYUED)
+
+    GOTO  PGCHK
+SIT0061L:
+    ?STEP :=   'SIT0061L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+  /. 2019.03.18 ./
+  /.CALL PGM-SIT0060L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)     ./
+    CALL PGM-SIT0061L.TOKSOLIB,PARA-(?BUMON,?TANST,?NYUST,?NYUED)
+    GOTO  PGCHK
+SIT0082L:
+    ?STEP :=   'SIT0082L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+  /. 2019.03.18 ./
+  /.CALL PGM-SIT0081L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)     ./
+    CALL PGM-SIT0082L.TOKSOLIB,PARA-(?BUMON,?TANST,?NYUST,?NYUED)
+    GOTO  PGCHK
+SIT0102L:
+    ?STEP :=   'SIT0102L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+  /. 2019.03.18 ./
+  /.CALL PGM-SIT0101L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)     ./
+    CALL PGM-SIT0102L.TOKSOLIB,PARA-(?BUMON,?TANST,?NYUST,?NYUED)
+    GOTO  PGCHK
+SIT0121L:
+    ?STEP :=   'SIT0121L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+  /. 2019.03.18 ./
+  /.CALL PGM-SIT0120L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)      ./
+    CALL PGM-SIT0121L.TOKSOLIB,PARA-(?BUMON,?TANST,?NYUST,?NYUED)
+    GOTO  PGCHK
+SIT0140L:
+    ?STEP :=   'SIT0140L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+    CALL PGM-SIT0140L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)
+    GOTO  PGCHK
+SIT0161L:
+    ?STEP :=   'SIT0161L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+  /. 2019.03.18 ./
+  /.CALL PGM-SIT0160L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)     ./
+    CALL PGM-SIT0161L.TOKSOLIB,PARA-(?BUMON,?TANST,?NYUST,?NYUED)
+    GOTO  PGCHK
+SIT0181L:
+    ?STEP :=   'SIT0181L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+  /. 2019.03.18 ./
+  /.CALL PGM-SIT0180L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)      ./
+    CALL PGM-SIT0181L.TOKSOLIB,PARA-(?BUMON,?TANST,?NYUST,?NYUED)
+    GOTO  PGCHK
+SIT0026L:
+    ?STEP :=   'SIT0026L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+    END
+  /. 2019.03.18 ./
+  /.CALL PGM-SIT0025L.TOKELIBO,PARA-(?BUMON,?TANST,
+                   ?NYUST,?STIME,?NYUED,?ETIME)     ./
+    CALL PGM-SIT0026L.TOKSOLIB,PARA-(?BUMON,?TANST,?NYUST,?NYUED)
+    GOTO  PGCHK
+
+PGCHK:
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

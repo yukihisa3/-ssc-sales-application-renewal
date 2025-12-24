@@ -1,0 +1,70 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　出荷検品システム（本社システム）      *  ./
+/. *   SYSTEM-NAME :    出荷検品システム　　　　　　　　　　 *  ./
+/. *   JOB-ID      :    PMG00300                             *  ./
+/. *   JOB-NAME    :    受信データ更新／累積処理             *  ./
+/. ***********************************************************  ./
+    PGM
+
+    VAR   ?PGMEC ,INTEGER
+    VAR   ?PGMECX,STRING*11
+    VAR   ?PGMEM ,STRING*99
+    VAR   ?MSG   ,STRING*99(6)
+    VAR   ?MSGX  ,STRING*99
+    VAR   ?PGMID ,STRING*8,VALUE-'PMG00300'
+    VAR   ?STEP  ,STRING*8
+    VAR   ?PGNM    ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR   ?KEKA1   ,STRING*40                  /.      2    ./
+    VAR   ?KEKA2   ,STRING*40                  /.      3    ./
+    VAR   ?KEKA3   ,STRING*40                  /.      4    ./
+    VAR   ?KEKA4   ,STRING*40                  /.      5    ./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ?PGNM  :=  '出荷検品システム－検品ＤＴ取り込み処理'
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    ?KEKA4 :=  '（更新処理中）'
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB
+
+/.##倉庫ｺｰﾄﾞ選択##./
+SMG0030I:
+
+    ?STEP :=   'SMG0030I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    CALL      PGM-SMG0030I.TOKELIB,PARA-('1',?PGNM,?KEKA1,?KEKA2,
+                                         ?KEKA3,?KEKA4)
+    IF        @PGMEC    ^=   0   THEN
+              GOTO ABEND
+    END
+
+RTN: /.##ﾌﾟﾛｸﾞﾗﾑ正常時、終了ﾒｯｾｰｼﾞ##./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:/.##ﾌﾟﾛｸﾞﾗﾑ異常終了時、終了ﾒｯｾｰｼﾞ##./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

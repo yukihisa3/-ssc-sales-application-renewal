@@ -1,0 +1,830 @@
+****************************************************************
+*    顧客名　　　　　　　：　（株）サカタのタネ殿　　　　　　　*
+*    業務名　　　　　　　：　在庫管理システム　　　　　　　　　*
+*    モジュール名　　　　：　送り状印刷　　　　　　            *
+*    作成日／作成者　　　：　2002/02/20 /NAV                   *
+*                            郵便番号８桁化                    *
+*    更新日／更新者　　　：　2006/0201   NAV T.MATSUNO         *
+*    再利用ＰＧ　　　　　：  ZDA0220B.SKTSLIB                  *
+*    処理概要　　　　　　：　送り状Ｆを読み，画面より入力された*
+*                            処理区分を判定し，送り状を印刷する*
+*    更新概要　　　　　　：　出荷日変更　(2006/02/01)          *
+****************************************************************
+ IDENTIFICATION         DIVISION.
+ PROGRAM-ID.            SKR0040L.
+*AUTHER.                NAV.
+*
+ ENVIRONMENT            DIVISION.
+ CONFIGURATION          SECTION.
+ SOURCE-COMPUTER.       FUJITSU.
+ OBJECT-COMPUTER.       FUJITSU.
+ SPECIAL-NAMES.
+         STATION   IS   STAT
+         CONSOLE   IS   CONS.
+*
+ INPUT-OUTPUT           SECTION.
+ FILE-CONTROL.
+*-----<<  送り状ファイル  >>-----*
+     SELECT   KOKURIF   ASSIGN    TO        DA-01-S-KOKURIF
+                        ORGANIZATION        IS   SEQUENTIAL
+                        ACCESS    MODE      IS   SEQUENTIAL
+                        FILE      STATUS    IS   OKU-STS.
+*-----<<  画面ファイル  >>-----*
+     SELECT   DSPF      ASSIGN    TO        GS-DSPF
+                        ORGANIZATION        IS   SEQUENTIAL
+                        ACCESS    MODE      IS   SEQUENTIAL
+                        SYMBOLIC  DESTINATION    IS  "DSP"
+                        PROCESSING MODE     IS   DSP-PROC
+                        GROUP               IS   DSP-GROUP
+                        FORMAT              IS   DSP-FORMAT
+                        SELECTED  FUNCTION  IS   DSP-FUNC
+                        FILE      STATUS    IS   DSP-STATUS.
+*-----<<  プリントファイル  >>-----*
+     SELECT   PRTF      ASSIGN      TO      GS-PRTF
+                        ACCESS MODE         IS  SEQUENTIAL
+                        ORGANIZATION        IS  SEQUENTIAL
+                        FORMAT              IS  PRT-FMT
+                        GROUP               IS  PRT-GRP
+                        PROCESSING  MODE    IS  PRT-PRO
+                        UNIT CONTROL        IS  PRT-CON
+                        DESTINATION         IS  "PRT"
+                        FILE STATUS         IS  PRT-ST
+                        DESTINATION-1       IS  PRT-DES.
+****************************************************************
+ DATA                   DIVISION.
+ FILE                   SECTION.
+*-----<<  送り状ファイル  >>-----*
+ FD  KOKURIF.
+     COPY     KOKURIF   OF   XFDLIB  JOINING   OKU  PREFIX.
+*-----<<  画面ファイル  >>-----*
+ FD  DSPF.
+     COPY   FKR00403    OF        XMDLIB.
+*-----<<  プリントファイル  >>-----*
+ FD  PRTF.
+ 01  PRT-AREA                PIC  X(3000).
+****************************************************************
+*   ＷＯＲＫＩＮＧ－ＳＴＯＲＡＧＥ　　　ＳＥＣＴＩＯＮ
+****************************************************************
+ WORKING-STORAGE        SECTION.
+****  プリントファイル  ****
+ COPY   FKR00404         OF        XMDLIB.
+ COPY   FKR00405         OF        XMDLIB.
+ COPY   FKR00406         OF        XMDLIB.
+ COPY   FKR00407         OF        XMDLIB.
+****  画面制御項目  ****
+ 01  DSP-CONTROL.
+     03  DSP-PROC            PIC  X(02).
+     03  DSP-GROUP           PIC  X(08).
+     03  DSP-FORMAT          PIC  X(08).
+     03  DSP-STATUS          PIC  X(02).
+     03  DSP-FUNC            PIC  X(04).
+****  プリンタ制御項目  ****
+ 01  PRT-CNTL.
+     03  PRT-FMT             PIC  X(08).
+     03  PRT-DES             PIC  X(08).
+     03  PRT-GRP             PIC  X(08).
+     03  PRT-PRO             PIC  X(02).
+     03  PRT-ST              PIC  X(02).
+     03  PRT-CON.
+         05  PRT-CON1        PIC  X(04).
+         05  PRT-CON2        PIC  9(02)     VALUE     ZERO.
+****  ステイタス情報  ***
+ 01  STATUS-AREA.
+     03  OKU-STS             PIC  X(02).
+****  フラグ                  ****
+ 01  END-FLG                 PIC  X(03)  VALUE  SPACE.
+ 01  END-FLG1                PIC  X(03)  VALUE  SPACE.
+ 01  SYORI-FLG               PIC  9(01)  VALUE  ZERO.
+ 01  CHK-FLG                 PIC  9(01)  VALUE  ZERO.
+ 01  IX                      PIC  9(04).
+ 01  WORK-AREA.
+     03  WK-SYURUI           PIC  9(01)  VALUE  ZERO.
+****  カウント  エリア        ****
+ 01  CNT-AREA                VALUE    ZERO.
+     03 IN-CNT1              PIC  9(07).
+     03 IN-CNT2              PIC  9(07).
+     03 PRT-CNT1             PIC  9(07).
+     03 PRT-CNT2             PIC  9(07).
+*
+*日付／時刻
+ 01  TIME-AREA.
+     03  WK-TIME                  PIC  9(08)  VALUE  ZERO.
+ 01  DATE-AREA.
+     03  WK-YS                    PIC  9(02)  VALUE  ZERO.
+     03  WK-DATE.
+         05  WK-Y                 PIC  9(02)  VALUE  ZERO.
+         05  WK-M                 PIC  9(02)  VALUE  ZERO.
+         05  WK-D                 PIC  9(02)  VALUE  ZERO.
+ 01  DATE-AREAR2       REDEFINES      DATE-AREA.
+     03  SYS-DATE                 PIC  9(08).
+ 01  WK-SYSYY.
+     03  WK-SYSYY1                PIC  X(02)  VALUE  "20".
+     03  WK-SYSYY2                PIC  X(02)  VALUE  ZERO.
+*画面表示日付編集
+ 01  HEN-DATE.
+     03  HEN-DATE-YYYY            PIC  9(04)  VALUE  ZERO.
+     03  FILLER                   PIC  X(01)  VALUE  "/".
+     03  HEN-DATE-MM              PIC  9(02)  VALUE  ZERO.
+     03  FILLER                   PIC  X(01)  VALUE  "/".
+     03  HEN-DATE-DD              PIC  9(02)  VALUE  ZERO.
+*画面表示時刻編集
+ 01  HEN-TIME.
+     03  HEN-TIME-HH              PIC  9(02)  VALUE  ZERO.
+     03  FILLER                   PIC  X(01)  VALUE  ":".
+     03  HEN-TIME-MM              PIC  9(02)  VALUE  ZERO.
+     03  FILLER                   PIC  X(01)  VALUE  ":".
+     03  HEN-TIME-SS              PIC  9(02)  VALUE  ZERO.
+****  （株）サカタのタネ殿エリア   ****
+ 01  WK-AREA.
+     03 WK-PRT1              PIC  X(08)   VALUE  "701-0165".
+     03 WK-PRT2              PIC  N(12)   VALUE
+             NC"岡山県岡山市大内田８１９".
+     03 WK-PRT3              PIC  N(13)   VALUE
+             NC"　カトーレック（株）岡山内".
+     03 WK-PRT31             PIC  N(13)   VALUE
+             NC"　サカタのタネ配送センター".
+     03 WK-PRT4              PIC  X(12)   VALUE  "086-292-5777".
+****  郵便番号編集
+ 01  YUBIN.
+     03  YUBIN1              PIC  X(03)   VALUE  SPACE.
+     03  HAIFUN              PIC  X(01)   VALUE  "-".
+     03  YUBIN2              PIC  X(04)   VALUE  SPACE.
+****  ＰＦキーガイド  ***
+ 01  MSG-AREA.
+     03  PMSG01            PIC N(20) VALUE  NC"_取消　_終了".
+     03  PMSG02            PIC N(20) VALUE
+                           NC"_取消　_終了　_項目戻し".
+**** メッセージ情報           ****
+ 01  MSG-AREA1-1.
+     02  MSG-ABEND1.
+       03  FILLER            PIC  X(04)  VALUE  "### ".
+       03  ERR-PG-ID         PIC  X(08)  VALUE  "SKR0040L".
+       03  FILLER            PIC  X(10)  VALUE
+          " ABEND ###".
+     02  MSG-ABEND2.
+       03  FILLER            PIC  X(04)  VALUE  "### ".
+       03  ERR-FL-ID         PIC  X(08).
+       03  FILLER            PIC  X(04)  VALUE  " ST-".
+       03  ERR-STCD          PIC  X(02).
+       03  FILLER            PIC  X(04)  VALUE  " ###".
+****  エラーメッセージ  ***
+ 01  ERR-TAB.
+     03  MSG1                PIC  N(28)  VALUE
+            NC"無効ＰＦキーです。".
+     03  MSG2                PIC  N(28)  VALUE
+            NC"１，２以外はエラーです。".
+     03  MSG3                PIC  N(28)  VALUE
+            NC"１，２，３，４以外はエラーです。".
+     03  MSG4                PIC  N(28)  VALUE
+            NC"処理区分が未入力です。".
+     03  MSG5                PIC  N(28)  VALUE
+            NC"伝票種類が未入力です。".
+     03  MSG6                PIC  N(28)  VALUE
+            NC"Ｙで入力して下さい".
+     03  MSG7                PIC  N(28)  VALUE
+       NC"用紙を変えて下さい。（個口シール発行）".
+     03  MSG8                PIC  N(28)  VALUE
+       NC"＊＊＊＊＊【送り状発行中です！！】＊＊＊＊＊".
+*日付変換サブルーチン用ワーク
+ 01  LINK-IN-KBN           PIC X(01).
+ 01  LINK-IN-YMD6          PIC 9(06).
+ 01  LINK-IN-YMD8          PIC 9(08).
+ 01  LINK-OUT-RET          PIC X(01).
+ 01  LINK-OUT-YMD          PIC 9(08).
+*----------------------------------------------------------*
+*             ＭＡＩＮ         ＭＯＤＵＬＥ                *
+*----------------------------------------------------------*
+ PROCEDURE              DIVISION.
+*
+ DECLARATIVES.
+ FILEERR-SEC1           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   DSPF.
+     MOVE     "DSPF    "       TO   ERR-FL-ID.
+     MOVE      DSP-STATUS      TO   ERR-STCD.
+     DISPLAY   MSG-ABEND1    UPON   CONS.
+     DISPLAY   MSG-ABEND2    UPON   CONS.
+     MOVE      4000            TO   PROGRAM-STATUS.
+     STOP      RUN.
+***
+ FILEERR-SEC2        SECTION.
+     USE AFTER    EXCEPTION
+                  PROCEDURE    PRTF.
+     MOVE   "PRTF"             TO   ERR-FL-ID.
+     MOVE    PRT-ST            TO   ERR-STCD.
+     DISPLAY   MSG-ABEND1      UPON   CONS.
+     DISPLAY   MSG-ABEND2      UPON   CONS.
+     MOVE      4000            TO   PROGRAM-STATUS.
+     STOP     RUN.
+**
+ FILEERR-SEC3           SECTION.
+     USE       AFTER    EXCEPTION
+                        PROCEDURE   KOKURIF.
+     MOVE     "KOKURIF"        TO   ERR-FL-ID.
+     MOVE      OKU-STS         TO   ERR-STCD.
+     DISPLAY   MSG-ABEND1    UPON   CONS.
+     DISPLAY   MSG-ABEND2    UPON   CONS.
+     MOVE      4000            TO   PROGRAM-STATUS.
+     STOP      RUN.
+ END     DECLARATIVES.
+************************************************************
+*      ■０     メインモジュール                           *
+************************************************************
+ SKR0040L-START         SECTION.
+     PERFORM       INIT-SEC.
+     PERFORM       MAIN-SEC
+                   UNTIL     END-FLG  =    "END".
+     PERFORM       END-SEC.
+     STOP     RUN.
+ SKR0040L-END.
+     EXIT.
+************************************************************
+*      ■０     初期処理                                   *
+************************************************************
+ INIT-SEC               SECTION.
+* ファイルＯＰＥＮ
+     OPEN     INPUT     KOKURIF.
+     OPEN     I-O       DSPF.
+     OPEN     OUTPUT    PRTF.
+*
+*システム日付・時刻の取得
+     ACCEPT   WK-DATE           FROM   DATE.
+     MOVE     "3"                 TO   LINK-IN-KBN.
+     MOVE     WK-DATE             TO   LINK-IN-YMD6.
+     MOVE     ZERO                TO   LINK-IN-YMD8.
+     MOVE     ZERO                TO   LINK-OUT-RET.
+     MOVE     ZERO                TO   LINK-OUT-YMD.
+     CALL     "SKYDTCKB"       USING   LINK-IN-KBN
+                                       LINK-IN-YMD6
+                                       LINK-IN-YMD8
+                                       LINK-OUT-RET
+                                       LINK-OUT-YMD.
+     MOVE      LINK-OUT-YMD       TO   DATE-AREA.
+*画面表示日付編集
+     MOVE      SYS-DATE(1:4)      TO   HEN-DATE-YYYY.
+     MOVE      SYS-DATE(5:2)      TO   HEN-DATE-MM.
+     MOVE      SYS-DATE(7:2)      TO   HEN-DATE-DD.
+*システム日付取得
+     ACCEPT    WK-TIME          FROM   TIME.
+*画面表示時刻編集
+     MOVE      WK-TIME(1:2)       TO   HEN-TIME-HH.
+     MOVE      WK-TIME(3:2)       TO   HEN-TIME-MM.
+     MOVE      WK-TIME(5:2)       TO   HEN-TIME-SS.
+*
+     MOVE    1               TO   SYORI-FLG.
+ INIT-END.
+     EXIT.
+************************************************************
+*      ■０      メイン処理                                *
+************************************************************
+ MAIN-SEC          SECTION.
+     EVALUATE      SYORI-FLG
+         WHEN      1    PERFORM   INIT-DSP-SEC
+         WHEN      2    PERFORM   HEAD-SEC
+         WHEN      3    PERFORM   KAKNIN-SEC
+         WHEN      4    PERFORM   LST1-SEC
+         WHEN      5    PERFORM   CL-OP-SEC
+         WHEN      6    PERFORM   LST2-SEC
+         WHEN      7    PERFORM   TEST-SEC
+     END-EVALUATE.
+ MAIN-END.
+     EXIT.
+************************************************************
+*      3.0        終了処理                                 *
+************************************************************
+ END-SEC                SECTION.
+* ファイルＣＬＯＳＥ
+     CLOSE    KOKURIF   DSPF  PRTF.
+     DISPLAY "(SKR0040L)ﾆｭｳﾘｮｸ ｹﾝｽｳ(ｵﾔ) = " IN-CNT1  UPON  CONS.
+     DISPLAY "(SKR0040L)ﾆｭｳﾘｮｸ ｹﾝｽｳ(ｺ)  = " IN-CNT2  UPON  CONS.
+     DISPLAY "(SKR0040L)ﾌﾟﾘﾝﾄ  ｹﾝｽｳ(ｵﾔ) = " PRT-CNT1 UPON  CONS.
+     DISPLAY "(SKR0040L)ﾌﾟﾘﾝﾄ  ｹﾝｽｳ(ｺ)  = " PRT-CNT2 UPON  CONS.
+ END-END.
+     EXIT.
+*----------------------------------------------------------*
+*      2.1       初期画面処理                              *
+*----------------------------------------------------------*
+ INIT-DSP-SEC        SECTION.
+     MOVE     SPACE          TO   FKR00403.
+     MOVE    "FKR00403"      TO   DSP-FORMAT.
+     MOVE     SPACE          TO   DSP-PROC.
+     MOVE     HEN-DATE       TO   SDATE.
+     MOVE     HEN-TIME       TO   STIME.
+*
+     MOVE   "M"     TO  EDIT-OPTION  OF  R00001
+                        EDIT-OPTION  OF  R00002.
+     MOVE  " "      TO  EDIT-CURSOR  OF  R00001
+                        EDIT-CURSOR  OF  R00002.
+     MOVE     2              TO   SYORI-FLG.
+     MOVE     0              TO   CHK-FLG.
+ INIT-DSP-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.2       ＨＥＡＤ処理           　　               *
+*----------------------------------------------------------*
+ HEAD-SEC            SECTION.
+     MOVE     PMSG01         TO   PFGID.
+     PERFORM         DSP-WRITE-SEC.
+*
+     MOVE    "HEAD"          TO   DSP-GROUP.
+     PERFORM         DSP-READ-SEC.
+* アテンション判定
+     EVALUATE    DSP-FUNC
+         WHEN   "F004"
+                        MOVE   1           TO   SYORI-FLG
+         WHEN   "F005"
+                        MOVE   "END"       TO   END-FLG
+         WHEN   "E000"
+                        PERFORM   HEAD-CHK-SEC
+         WHEN    OTHER
+                        MOVE   MSG1      TO   ERRMSG
+     END-EVALUATE.
+ HEAD1-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.2.1     ＨＥＡＤ部の入力チェック                  *
+*----------------------------------------------------------*
+ HEAD-CHK-SEC             SECTION.
+*処理区分未入力チェック
+     IF  ( R00001  NOT  NUMERIC   )
+         MOVE   MSG4      TO   ERRMSG
+         MOVE   "R"     TO   EDIT-OPTION  OF  R00001
+         MOVE   "C"     TO   EDIT-CURSOR  OF  R00001
+         GO     TO      HEAD-CHK-EXIT
+     END-IF.
+*処理区分チェック
+     IF  (  R00001 =  1  OR  2  )
+         CONTINUE
+     ELSE
+         MOVE   MSG2    TO   ERRMSG
+         MOVE   "R"     TO   EDIT-OPTION  OF  R00001
+         MOVE   "C"     TO   EDIT-CURSOR  OF  R00001
+         GO     TO      HEAD-CHK-EXIT
+     END-IF.
+     MOVE   "M"     TO   EDIT-OPTION  OF  R00001.
+     MOVE   " "     TO   EDIT-CURSOR  OF  R00001.
+*伝票種類未入力チェック
+     IF  ( R00002  NOT  NUMERIC   )
+         MOVE   MSG5      TO   ERRMSG
+         MOVE   "R"     TO   EDIT-OPTION  OF  R00002
+         MOVE   "C"     TO   EDIT-CURSOR  OF  R00002
+         GO     TO      HEAD-CHK-EXIT
+     END-IF.
+*伝票種類チェック
+     IF  (  R00002 =  1  OR  2  OR  3  OR  4)
+         EVALUATE    R00002
+             WHEN    1
+                     MOVE    NC"佐川急便"     TO  W00002
+             WHEN    2
+                     MOVE    NC"カトーレック" TO  W00002
+             WHEN    3
+                     MOVE    NC"西濃運輸"     TO  W00002
+             WHEN    4
+                     MOVE    NC"小口　　"     TO  W00002
+         END-EVALUATE
+     ELSE
+         MOVE   SPACE   TO   W00002
+         MOVE   MSG3    TO   ERRMSG
+         MOVE   "R"     TO   EDIT-OPTION  OF  R00002
+         MOVE   "C"     TO   EDIT-CURSOR  OF  R00002
+         GO     TO      HEAD-CHK-EXIT
+     END-IF.
+     MOVE   "M"     TO   EDIT-OPTION  OF  R00002.
+     MOVE   " "     TO   EDIT-CURSOR  OF  R00002.
+*
+     IF  (R00001    =   2)  AND (R00002    =   4)
+          MOVE    5             TO   SYORI-FLG
+     ELSE
+          MOVE    3             TO   SYORI-FLG
+     END-IF.
+***  MOVE     3              TO   SYORI-FLG.
+     MOVE   SPACE            TO   ERRMSG.
+ HEAD-CHK-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.3       確認入力処理                              *
+*----------------------------------------------------------*
+ KAKNIN-SEC       SECTION.
+     MOVE     "Y"            TO   R00003.
+     MOVE     PMSG02         TO   PFGID.
+     PERFORM       DSP-WRITE-SEC.
+*
+     MOVE    "KAKNIN"        TO    DSP-GROUP.
+     PERFORM       DSP-READ-SEC.
+* アテンション判定
+     EVALUATE  DSP-FUNC
+         WHEN   "F004"
+                        MOVE    1      TO   SYORI-FLG
+         WHEN   "F005"
+                        MOVE  "END"    TO   END-FLG
+         WHEN   "F006"
+                        MOVE   "M"  TO   EDIT-OPTION  OF  R00002
+                        MOVE   " "  TO   EDIT-CURSOR  OF  R00002
+                        MOVE    2      TO   SYORI-FLG
+                        MOVE    SPACE  TO   R00003
+         WHEN   "E000"
+                        IF  R00003  NOT  =  "Y"
+                            MOVE    MSG6       TO  ERRMSG
+                        ELSE
+                            IF  R00001  =   2
+                                MOVE    MSG8   TO   ERRMSG
+                                PERFORM DSP-WRITE-SEC
+                                PERFORM  OKU-READ-SEC
+                                IF  END-FLG1  =  "END"
+                                    MOVE   1    TO   SYORI-FLG
+                                    PERFORM   CL-OP-SEC2
+                                ELSE
+                                    IF  R00002  =  OKU-F01
+                                        MOVE  4      TO  SYORI-FLG
+                                    END-IF
+                                END-IF
+                            ELSE
+                                MOVE   7        TO   SYORI-FLG
+                            END-IF
+                        END-IF
+         WHEN    OTHER
+                        MOVE    MSG1   TO   ERRMSG
+     END-EVALUATE.
+ KAKNIN-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.4       ＬＩＳＴ処理  （親）                      *
+*----------------------------------------------------------*
+ LST1-SEC         SECTION.
+* 伝票種類判定
+     EVALUATE   R00002
+         WHEN   1     PERFORM  PRT1-SEC
+         WHEN   2     PERFORM  PRT2-SEC
+         WHEN   3     PERFORM  PRT3-SEC
+     END-EVALUATE.
+* 送り状ファイルＲＥＡＤ
+     PERFORM   OKU-READ-SEC.
+ LST1-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.4.1     ＬＩＳＴ処理  ( 佐川急便）                *
+*----------------------------------------------------------*
+ PRT1-SEC         SECTION.
+     MOVE     SPACE            TO   FKR00404.
+* ファイルからＰＲＴへ
+***  郵便番号
+     MOVE  OKU-F151            TO   YUBIN1.
+     MOVE  OKU-F152            TO   YUBIN2.
+     MOVE  YUBIN               TO   W10001.
+***
+     MOVE  OKU-F11             TO   W10002.
+     MOVE  OKU-F07             TO   W10003.
+     MOVE  OKU-F08             TO   W10004.
+     MOVE  OKU-F03             TO   W10005.
+     MOVE  OKU-F05             TO   W10006.
+     MOVE  OKU-F06             TO   W10007.
+     MOVE  OKU-F09             TO   W10008.
+     MOVE  OKU-F10             TO   W10009.
+* 発送元印刷チェック
+     IF   OKU-F14  =  1
+          MOVE  WK-PRT1             TO   W11001
+          MOVE  WK-PRT2             TO   W11002
+          MOVE  WK-PRT3             TO   W11003
+          MOVE  WK-PRT31            TO   W11004
+          MOVE  WK-PRT4             TO   W11005
+     END-IF.
+* 送り状印刷
+     MOVE     SPACE            TO   PRT-PRO.
+     MOVE     "FKR00404"       TO   PRT-FMT.
+     MOVE     SPACE            TO   PRT-CON1.
+     MOVE     "GRP101"         TO   PRT-GRP.
+     PERFORM   VARYING     IX     FROM   1   BY   1  UNTIL
+                                      IX   >   OKU-F12
+               WRITE    PRT-AREA       FROM    FKR00404
+               ADD      1                TO    PRT-CNT1
+**             CLOSE    PRTF
+**             OPEN    OUTPUT   PRTF
+     END-PERFORM.
+ PRT1-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.4.2     ＬＩＳＴ処理  ( カトーレック）            *
+*----------------------------------------------------------*
+ PRT2-SEC         SECTION.
+     MOVE     SPACE            TO   FKR00405.
+*システム日付セット
+     MOVE     HEN-DATE-YYYY    TO   SYSYY.
+     MOVE     HEN-DATE-MM      TO   SYSMM.
+     MOVE     HEN-DATE-DD      TO   SYSDD.
+* ファイルからＰＲＴへ
+***  郵便番号
+     MOVE  OKU-F151            TO   YUBIN1.
+     MOVE  OKU-F152            TO   YUBIN2.
+     MOVE  YUBIN               TO   W20001.
+***
+     MOVE  OKU-F07             TO   W20003.
+     MOVE  OKU-F08             TO   W20004.
+     MOVE  OKU-F03             TO   W20005.
+     MOVE  OKU-F05             TO   W20006.
+     MOVE  OKU-F06             TO   W20007.
+     MOVE  OKU-F09             TO   W20008.
+     MOVE  OKU-F10             TO   W20009.
+* 発送元印刷チェック
+     IF   OKU-F14  =  1
+          MOVE  WK-PRT1             TO   W22001
+          MOVE  WK-PRT2             TO   W22002
+          MOVE  WK-PRT3             TO   W22003
+          MOVE  WK-PRT31            TO   W22004
+          MOVE  WK-PRT4             TO   W22005
+     END-IF.
+***  個数
+     MOVE  OKU-F11             TO   W001.
+* 送り状印刷
+     MOVE     SPACE            TO   PRT-PRO.
+     MOVE     "FKR00405"       TO   PRT-FMT.
+     MOVE     SPACE            TO   PRT-CON1.
+     MOVE     "GRP201"         TO   PRT-GRP.
+     PERFORM   VARYING     IX     FROM   1   BY   1  UNTIL
+                                      IX   >   OKU-F12
+               WRITE    PRT-AREA       FROM    FKR00405
+               ADD      1                TO    PRT-CNT1
+**             CLOSE    PRTF
+**             OPEN    OUTPUT   PRTF
+     END-PERFORM.
+ PRT2-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.4.3     ＬＩＳＴ処理  ( 路線便）                  *
+*----------------------------------------------------------*
+ PRT3-SEC         SECTION.
+     MOVE     SPACE            TO   FKR00406.
+*システム日付セット
+*****MOVE     HEN-DATE-YYYY    TO   SYSYY3.
+*****MOVE     HEN-DATE-MM      TO   SYSMM3.
+*****MOVE     HEN-DATE-DD      TO   SYSDD3.
+     MOVE     OKU-F04(1:2)     TO   WK-SYSYY2.
+     MOVE     WK-SYSYY         TO   SYSYY3.
+*****MOVE     OKU-F04(1:2)     TO   SYSYY3.
+     MOVE     OKU-F04(3:2)     TO   SYSMM3.
+     MOVE     OKU-F04(5:2)     TO   SYSDD3.
+*****MOVE     WK-Y             TO   SYSYY3.
+*****MOVE     WK-M             TO   SYSMM3.
+*****MOVE     WK-D             TO   SYSDD3.
+* ファイルからＰＲＴへ
+***  郵便番号
+     MOVE  OKU-F151            TO   YUBIN1.
+     MOVE  OKU-F152            TO   YUBIN2.
+     MOVE  YUBIN               TO   W30001.
+***
+     MOVE  OKU-F11             TO   W30002.
+     MOVE  OKU-F07             TO   W30003.
+     MOVE  OKU-F08             TO   W30004.
+     MOVE  OKU-F03             TO   W30005.
+     MOVE  OKU-F05             TO   W30006.
+     MOVE  OKU-F06             TO   W30007.
+     MOVE  OKU-F09             TO   W30008.
+     MOVE  OKU-F10             TO   W30009.
+* 発送元印刷チェック
+     IF   OKU-F14  =  1
+          MOVE  WK-PRT1             TO   W33001
+          MOVE  WK-PRT2             TO   W33002
+          MOVE  WK-PRT3             TO   W33003
+          MOVE  WK-PRT31            TO   W33004
+          MOVE  WK-PRT4             TO   W33005
+     END-IF.
+***  個数
+     MOVE  OKU-F11             TO   W30002.
+* 送り状印刷
+     MOVE     SPACE            TO   PRT-PRO.
+     MOVE     "FKR00406"       TO   PRT-FMT.
+     MOVE     SPACE            TO   PRT-CON1.
+     MOVE     "GRP301"         TO   PRT-GRP.
+     PERFORM   VARYING     IX     FROM   1   BY   1  UNTIL
+                                      IX   >   OKU-F12
+               WRITE    PRT-AREA       FROM    FKR00406
+               ADD      1                TO    PRT-CNT1
+**             CLOSE    PRTF
+**             OPEN    OUTPUT   PRTF
+     END-PERFORM.
+ PRT3-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.5       ファイルＣＬＯＳＥ,ＯＰＥＮ処理           *
+*----------------------------------------------------------*
+ CL-OP-SEC        SECTION.
+* ファイルＣＬＯＳＥ
+     CLOSE    KOKURIF.
+     CLOSE    PRTF.
+* ファイルＯＰＥＮ
+     OPEN     INPUT     KOKURIF.
+     OPEN     OUTPUT    PRTF.
+* 子リスト存在チェック
+**   IF   CHK-FLG    =    ZERO
+**        PERFORM   CL-OP-SEC2
+**        MOVE    1             TO   SYORI-FLG
+**        GO    TO    CL-OP-EXIT
+**   END-IF.
+* メッセージ出力
+     MOVE     "Y"            TO   R00003.
+     MOVE     PMSG02         TO   PFGID.
+     MOVE     MSG7           TO   ERRMSG.
+     PERFORM         DSP-WRITE-SEC.
+*
+     MOVE    "KAKNIN"        TO    DSP-GROUP.
+     PERFORM       DSP-READ-SEC.
+* アテンション判定
+     EVALUATE   DSP-FUNC
+         WHEN   "F004"
+                        PERFORM   CL-OP-SEC2
+                        MOVE    1      TO   SYORI-FLG
+         WHEN   "F005"
+                        MOVE  "END"    TO   END-FLG
+         WHEN   "F006"
+                        PERFORM   CL-OP-SEC2
+                        MOVE    2      TO   SYORI-FLG
+                        MOVE    SPACE  TO   R00003
+         WHEN    "E000"
+                   IF  R00003  NOT  =  "Y"
+                       MOVE    MSG6       TO  ERRMSG
+                   ELSE
+                       PERFORM   OKU-READ-SEC2
+                       IF     SYORI-FLG  NOT = 1
+                           MOVE    6             TO   SYORI-FLG
+                       END-IF
+                   END-IF
+         WHEN    OTHER
+                   MOVE    MSG1   TO   ERRMSG
+     END-EVALUATE.
+ CL-OP-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.6       ＬＩＳＴ処理  （子）                      *
+*----------------------------------------------------------*
+ LST2-SEC         SECTION.
+     MOVE     SPACE            TO   FKR00407.
+* ファイルからＰＲＴへ
+***  郵便番号
+     MOVE  OKU-F151            TO   YUBIN1.
+     MOVE  OKU-F152            TO   YUBIN2.
+     MOVE  YUBIN               TO   W40001.
+***
+     MOVE  OKU-F11             TO   W40002.
+     MOVE  OKU-F07             TO   W40003.
+     MOVE  OKU-F08             TO   W40004.
+     MOVE  OKU-F03             TO   W40005.
+     MOVE  OKU-F05             TO   W40006.
+     MOVE  OKU-F06             TO   W40007.
+     MOVE  OKU-F09             TO   W40008.
+**** MOVE  OKU-F10(1:8)        TO   W40009.
+* 伝票種類判定
+     EVALUATE    OKU-F01
+         WHEN    1
+                 MOVE    NC"佐川急便"     TO  W40009
+         WHEN    2
+                 MOVE    NC"カトーレック" TO  W40009
+         WHEN    3
+                 MOVE    NC"西濃運輸"     TO  W40009
+         WHEN    OTHER
+                 MOVE    SPACE            TO  W40009
+     END-EVALUATE.
+* 送り状印刷
+     MOVE     SPACE            TO   PRT-PRO.
+     MOVE     "FKR00407"       TO   PRT-FMT.
+     MOVE     SPACE            TO   PRT-CON1.
+     MOVE     "GRP401"         TO   PRT-GRP.
+     PERFORM   VARYING     IX     FROM   1   BY   1  UNTIL
+                                      IX   >   OKU-F13
+               WRITE    PRT-AREA       FROM    FKR00407
+               ADD      1                TO    PRT-CNT2
+**             CLOSE    PRTF
+**             OPEN    OUTPUT   PRTF
+     END-PERFORM.
+* 送り状ファイルＲＥＡＤ
+     PERFORM   OKU-READ-SEC2.
+ LST2-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*      2.7       ＬＩＳＴ処理  ( テストプリント）          *
+*----------------------------------------------------------*
+ TEST-SEC         SECTION.
+* 伝票種類判定, 送り状印刷（親テスト）
+     EVALUATE   R00002
+         WHEN   1
+                MOVE  SPACE               TO   FKR00404
+                MOVE  ALL "*"             TO   W10001  W10008
+                                               MAS101  MAS102
+                MOVE  ALL NC"＊"          TO   W10003  W10004
+                                               W10006  W10007
+                                               W10009
+                MOVE     SPACE            TO   PRT-PRO
+                MOVE     "FKR00404"       TO   PRT-FMT
+                MOVE     SPACE            TO   PRT-CON1
+                MOVE     "GRP101"         TO   PRT-GRP
+                WRITE    PRT-AREA       FROM    FKR00404
+         WHEN   2
+                MOVE  SPACE               TO   FKR00405
+                MOVE  ALL "*"             TO   W20001  W20008
+                MOVE  99999               TO   W20005
+                MOVE  ALL NC"＊"          TO   W20003  W20004
+                                               W20006  W20007
+                                               W20009
+                MOVE     SPACE            TO   PRT-PRO
+                MOVE     "FKR00405"       TO   PRT-FMT
+                MOVE     SPACE            TO   PRT-CON1
+                MOVE     "GRP201"         TO   PRT-GRP
+                WRITE    PRT-AREA       FROM    FKR00405
+         WHEN   3
+                MOVE  SPACE               TO   FKR00406
+                MOVE  ALL "*"             TO   W30001  W30008
+                MOVE  ALL NC"＊"          TO   W30003  W30004
+                                               W30006  W30007
+                                               W30009
+                MOVE     SPACE            TO   PRT-PRO
+                MOVE     "FKR00406"       TO   PRT-FMT
+                MOVE     SPACE            TO   PRT-CON1
+                MOVE     "GRP301"         TO   PRT-GRP
+                WRITE    PRT-AREA       FROM    FKR00406
+         WHEN   4
+                MOVE  SPACE               TO   FKR00407
+                MOVE  ALL "*"             TO   W40001  W40008
+                MOVE  ALL NC"＊"          TO   W40003  W40004
+                                               W40006  W40007
+                                               W40009
+                MOVE     SPACE            TO   PRT-PRO
+                MOVE     "FKR00407"       TO   PRT-FMT
+                MOVE     SPACE            TO   PRT-CON1
+                MOVE     "GRP401"         TO   PRT-GRP
+                WRITE    PRT-AREA       FROM    FKR00407
+     END-EVALUATE.
+     MOVE     1                TO   SYORI-FLG.
+     CLOSE    PRTF.
+     OPEN     OUTPUT    PRTF.
+ TEST-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*                送り状ＦＲＥＡＤ処理                      *
+*----------------------------------------------------------*
+ OKU-READ-SEC           SECTION.
+     READ    KOKURIF
+             AT   END
+                  MOVE   "END"    TO   END-FLG1
+                  MOVE R00002     TO   WK-SYURUI
+                  MOVE   5        TO   SYORI-FLG
+       NOT   AT   END
+                  IF   R00002  NOT   =   OKU-F01
+                       GO    TO   OKU-READ-SEC
+                  END-IF
+                  ADD    1        TO   IN-CNT1
+                  IF     OKU-F13   NOT   =   ZERO
+                         MOVE    1       TO   CHK-FLG
+                  END-IF
+     END-READ.
+ OKU-READ-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*                送り状ＦＲＥＡＤ処理                      *
+*----------------------------------------------------------*
+ OKU-READ-SEC2          SECTION.
+     READ    KOKURIF
+             AT   END
+                  MOVE   1        TO   SYORI-FLG
+                  PERFORM   CL-OP-SEC2
+       NOT   AT   END
+                  IF   OKU-F13    =    ZERO
+                       GO    TO   OKU-READ-SEC2
+                  END-IF
+                  ADD    1        TO   IN-CNT2
+     END-READ.
+ OKU-READ2-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*                ファイルＣＬＯＳＥ,ＯＰＥＮ処理           *
+*----------------------------------------------------------*
+ CL-OP-SEC2       SECTION.
+* ファイルＣＬＯＳＥ
+     CLOSE    KOKURIF.
+     CLOSE    PRTF.
+* ファイルＯＰＥＮ
+     OPEN     INPUT     KOKURIF.
+     OPEN     OUTPUT    PRTF.
+     MOVE     SPACE     TO     END-FLG1.
+ CL-OP2-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*                画面表示処理                              *
+*----------------------------------------------------------*
+ DSP-WRITE-SEC         SECTION.
+
+     MOVE  NC"１：佐川２：カトーレック３：西濃便４：小口"
+                             TO   W00002.
+     MOVE    "FKR00403"      TO   DSP-FORMAT.
+     MOVE    "SCREEN"        TO   DSP-GROUP.
+     MOVE     SPACE          TO   DSP-PROC.
+*
+     WRITE    FKR00403.
+ DSP-WRITE-EXIT.
+     EXIT.
+*----------------------------------------------------------*
+*                画面データの入力処理                      *
+*----------------------------------------------------------*
+ DSP-READ-SEC           SECTION.
+     MOVE  "NE"    TO   DSP-PROC.
+     READ   DSPF.
+ DSP-READ-EXIT.
+     EXIT.
+*****************<<  PROGRAM  END  >>***********************

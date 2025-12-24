@@ -1,0 +1,109 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    Ｄ３６５連携　　　　　　  　　　     *  ./
+/. *   JOB-ID      :    PVS00400                             *  ./
+/. *   JOB-NAME    :    送受信履歴Ｆ更新　　　　　　　　　　 *  ./
+/. *               :                                         *  ./
+/. ***********************************************************  ./
+/.###ﾊﾟﾗﾒﾀ 定義####./
+    PGM (P1-?BUMON,P2-?TANCD,P3-?SIJI,P4-?SJKBN,P5-?JDKBN,
+    P6-?DTKBN,P7-?DTKENSU,P8-?SIJIDT,P9-?SIJITM,P10-?SIJIKEKA,
+    P11-?SIJITANC,P12-?KEKADT,P13-?KEKATM,P14-?KEKAKBN,
+    P15-?JIKONO)
+    PARA ?BUMON   ,STRING*4,IN,VALUE-'    '        /.部門./
+    PARA ?TANCD   ,STRING*2,IN,VALUE-'  '          /.担当者./
+    PARA ?SIJI    ,STRING*10,IN,VALUE-'          ' /.指示ＮＯ./
+    PARA ?SJKBN   ,STRING*1,IN,VALUE-' '           /.送受信区分./
+    PARA ?JDKBN   ,STRING*1,IN,VALUE-' '           /.自動手動./
+    PARA ?DTKBN   ,STRING*2,IN,VALUE-'  '          /.データ区分./
+    PARA ?DTKENSU ,STRING*7,IN,VALUE-'0000000'     /.データ件数./
+    PARA ?SIJIDT  ,STRING*8,IN,VALUE-'00000000'    /.指示日付./
+    PARA ?SIJITM  ,STRING*6,IN,VALUE-'000000'      /.指示時刻./
+    PARA ?SIJIKEKA,STRING*4,IN,VALUE-'    '        /.指示結果./
+    PARA ?SIJITANC,STRING*2,IN,VALUE-'  '          /.指示担当者./
+    PARA ?KEKADT  ,STRING*8,IN,VALUE-'        '    /.結果日付./
+    PARA ?KEKATM  ,STRING*6,IN,VALUE-'      '      /.結果時刻./
+    PARA ?KEKAKBN ,STRING*4,IN,VALUE-'    '        /.結果区分./
+    PARA ?JIKONO  ,STRING*7,IN,VALUE-'       '     /.実行ＮＯ./
+/.###ﾜｰｸｴﾘｱ定義###./
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PVS00400'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1./
+    VAR ?KEKA1    ,STRING*40                    /.      2./
+    VAR ?KEKA2    ,STRING*40                    /.      3./
+    VAR ?KEKA3    ,STRING*40                    /.      4./
+    VAR ?KEKA4    ,STRING*40                    /.      5./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+/.###結果パラメタ###./
+    VAR ?KEKA     ,STRING*1,VALUE-'0'           /.実行結果./
+
+/.###ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL D365DLIB/TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '送受信履歴Ｆ更新'
+
+/.##ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.##送受信履歴Ｆ更新##./
+NVS0040B:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CALL PGM-NVS0040B.TOKSOLIB,
+         PARA-(?BUMON,?TANCD,?SIJI,?SJKBN,?JDKBN,?DTKBN,?DTKENSU,
+         ?SIJIDT,?SIJITM,?SIJIKEKA,?SIJITANC,?KEKADT,?KEKATM,
+         ?KEKAKBN,?JIKONO)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '送受信履歴Ｆ更新'
+              GOTO ABEND
+    END
+
+
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+              /.１２３４５６７８９０１２３４５６７８９０./
+    ?KEKA1 :=  '送受信履歴Ｆ更新異常です'
+    ?KEKA2 :=  'ログリスト等を採取しＮＡＶへ連絡して下'
+    ?KEKA3 :=  'さい。'
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO ?MSGX :=   ?MSG(?I)
+           SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+
+    RETURN    PGMEC-@PGMEC
+

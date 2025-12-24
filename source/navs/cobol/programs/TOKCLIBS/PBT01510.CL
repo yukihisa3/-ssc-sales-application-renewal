@@ -1,0 +1,116 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    業務改善（出荷改善）      　　　     *  ./
+/. *   JOB-ID      :    PBT01500                             *  ./
+/. *   JOB-NAME    :    オンライン出荷状況管理ファイル再作成 * ./
+/. *               :                                         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾊﾟﾗﾒﾀｴﾘｱ定義####./
+    VAR ?HIDUKE   ,STRING*8,VALUE-'        '    /.受信日付./
+    VAR ?JIKAN    ,STRING*4,VALUE-'    '        /.受信時間./
+    VAR ?TORICD   ,STRING*8,VALUE-'        '    /.受信取引先./
+    VAR ?ERRCD    ,STRING*1,VALUE-' '           /.エラーＣＤ./
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PBT01500'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+    VAR ?BUMON    ,STRING*04,VALUE-'    '          /.部門名       ./
+    VAR ?TANCD6   ,STRING*06,VALUE-'      '        /.担当者CDWK   ./
+    VAR ?TANCD    ,STRING*02,VALUE-'  '            /.担当者CD     ./
+
+/.##実行PG名称ｾｯﾄ##./
+    ?PGNM := 'オンライン出荷状況管理ＤＴ再作成'
+
+/.###ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB/TOKKLIB
+
+/.##ログインユーザー情報取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD6)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ログイン情報取得'
+              GOTO ABEND
+    END
+    ?TANCD := %SBSTR(?TANCD6,1,2)
+
+/.##バッチ_入力##./
+SKZ0130I:
+
+    ?STEP :=   'SKZ0130I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF  FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF     FILE-SHTDENLA,TOFILE-SHTDENLA.TOKFLIB
+    OVRF     FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    CALL PGM-SKZ0130I.TOKELIBO,PARA-(?HIDUKE,?JIKAN,?TORICD)
+    IF        @PGMEC    ^=   0    THEN
+         IF   @PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO RTN
+         ELSE
+              GOTO ABEND
+         END
+    END
+
+/.##出荷状況ファイル作成##./
+SBT0150B:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-SHTDENLJ,TOFILE-SHTDENLJ.TOKKLIB
+    OVRF      FILE-LNKONLL2,TOFILE-LNKONLL2.TOKKLIB
+    CALL      PGM-SBT0100B.TOKELIBO,PARA-(?BUMON,?TANCD,'T5',
+                                         ?HIDUKE,?JIKAN,?TORICD,
+                                         '00000000' ,'99999999')
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    END
+    DSPLOG CLR-@YES,EDT-@JEF
+
+    RETURN    PGMEC-@PGMEC
+

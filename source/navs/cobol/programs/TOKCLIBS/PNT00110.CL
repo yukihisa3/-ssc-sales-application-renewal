@@ -1,0 +1,233 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    仕入実績抽出処理　　　    　　　     *  ./
+/. *   JOB-ID      :    PNT00110                             *  ./
+/. *   JOB-NAME    :    仕入実績抽出処理　　　　　　　       *  ./
+/. ***********************************************************  ./
+/.### ﾜｰｸｴﾘｱ定義 ###./
+    PGM
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PNT00110'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1./
+    VAR ?KEKA1    ,STRING*40                    /.      2./
+    VAR ?KEKA2    ,STRING*40                    /.      3./
+    VAR ?KEKA3    ,STRING*40                    /.      4./
+    VAR ?KEKA4    ,STRING*40                    /.      5./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門名./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?OPR1     ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?OPR2     ,STRING*50                  /.      2    ./
+    VAR ?OPR3     ,STRING*50                  /.      3    ./
+    VAR ?OPR4     ,STRING*50                  /.      4    ./
+    VAR ?OPR5     ,STRING*50                  /.      5    ./
+    VAR ?DATEST   ,STRING*8,VALUE-'00000000'
+    VAR ?DATEED   ,STRING*8,VALUE-'00000000'
+    VAR ?SOKCD    ,STRING*2,VALUE-'  '
+    VAR ?SIRCD1   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD2   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD3   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD4   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD5   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD6   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD7   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD8   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD9   ,STRING*8,VALUE-'00000000'
+    VAR ?SIRCD10  ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD1   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD2   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD3   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD4   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD5   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD6   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD7   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD8   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD9   ,STRING*8,VALUE-'00000000'
+    VAR ?TOKCD10  ,STRING*8,VALUE-'00000000'
+
+/.### ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.## ﾗｲﾌﾞﾗﾘﾘｽﾄ登録 ##./
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB/TOKKLIB/TOKWLIB
+
+/.## ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ ##./
+    ?PGNM :=  '仕入実績データ抽出'
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得 ##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+/.## ログインユーザー情報取得 ##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ログイン情報取得'
+              GOTO ABEND
+    END
+/.##確認画面##./
+
+STEP010:
+
+    ?OPR1  :=  '【仕入実績データ抽出】'
+    ?OPR2  :=  '　仕入実績データの抽出を行ないます。'
+    ?OPR3  :=  '　確認お願い致します。'
+    ?OPR4  :=  ''
+    ?OPR5  :=  '　取消の場合、ＰＦ９を押して下さい。'
+    CALL      OHOM0900.XUCL,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+/.## 初期化 ##./
+STEP020:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CLRFILE FILE-NJISCSVF.TOKWLIB
+    IF  @PGMEC ^= 0  THEN
+           ?KEKA4 := '＜初期化＞'
+           GOTO  ABEND
+    END
+
+/.## 範囲指定 ##./
+STEP030:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CALL SNT0010I.TOKELIBO,PARA-(?DATEST,
+                                 ?DATEED,
+                                 ?SOKCD,
+                                 ?SIRCD1,
+                                 ?SIRCD2,
+                                 ?SIRCD3,
+                                 ?SIRCD4,
+                                 ?SIRCD5,
+                                 ?SIRCD6,
+                                 ?SIRCD7,
+                                 ?SIRCD8,
+                                 ?SIRCD9,
+                                 ?SIRCD10,
+                                 ?TOKCD1,
+                                 ?TOKCD2,
+                                 ?TOKCD3,
+                                 ?TOKCD4,
+                                 ?TOKCD5,
+                                 ?TOKCD6,
+                                 ?TOKCD7,
+                                 ?TOKCD8,
+                                 ?TOKCD9,
+                                 ?TOKCD10)
+    IF  @PGMEC ^= 0  THEN
+        IF  @PGMEC = 4010  THEN
+            SNDMSG MSG-'【取消終了】',TO-XCTL.@ORGPROF
+            RETURN
+        END
+        ?KEKA4 := '＜範囲指定＞'
+        GOTO  ABEND
+    END
+
+/.## 仕入実績抽出 ##./
+STEP040:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CALL SNT0021B.TOKELIBO,PARA-(?DATEST,
+                                 ?DATEED,
+                                 ?SOKCD,
+                                 ?SIRCD1,
+                                 ?SIRCD2,
+                                 ?SIRCD3,
+                                 ?SIRCD4,
+                                 ?SIRCD5,
+                                 ?SIRCD6,
+                                 ?SIRCD7,
+                                 ?SIRCD8,
+                                 ?SIRCD9,
+                                 ?SIRCD10,
+                                 ?TOKCD1,
+                                 ?TOKCD2,
+                                 ?TOKCD3,
+                                 ?TOKCD4,
+                                 ?TOKCD5,
+                                 ?TOKCD6,
+                                 ?TOKCD7,
+                                 ?TOKCD8,
+                                 ?TOKCD9,
+                                 ?TOKCD10)
+    IF  @PGMEC ^= 0  THEN
+           ?KEKA4 := '＜仕入実績抽出＞'
+           GOTO  ABEND
+    END
+
+/.## 出力 ##./
+STEP050:
+
+    ?STEP :=   %LAST(LABEL)      /.##ﾌﾟﾛｸﾞﾗﾑｽﾀｰﾄﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    CNVDF FILE-NJISCSVF.TOKWLIB,PATH-'/HGNAS/NJISCSVF.TXT',
+          MODE-@EXP,ADD-@NO,ACTCHK-@NO,HEADLINE-@YES,
+          EXTCNV-@YES
+    IF  @PGMEC ^= 0  THEN
+           ?KEKA4 := '＜ＣＳＶ出了＞'
+           GOTO  ABEND
+    END
+
+/.### ﾌﾟﾛｸﾞﾗﾑ終了 ###./
+RTN:
+    DEFLIBL TOKELIB/TOKELIBO
+              /.１２３４５６７８９０１２３４５６７８９０./
+    ?KEKA1 :=  '仕入実績データ抽出処理が正常終了しま'
+    ?KEKA2 :=  'した。出力内容を確認して下さい。'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /. ﾌﾟﾛｸﾞﾗﾑ異常終了時処理 ./
+    DEFLIBL TOKELIB/TOKELIBO
+              /.１２３４５６７８９０１２３４５６７８９０./
+    ?KEKA1 :=  '仕入実績データ抽出処理が異常終了しま'
+    ?KEKA2 :=  'した。ログを採取してＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO ?MSGX :=   ?MSG(?I)
+           SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES
+    END
+
+    RETURN    PGMEC-@PGMEC
+

@@ -1,0 +1,169 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　営業第２部　ＮＡＶＳ　　　　          *  ./
+/. *   SYSTEM-NAME :    ＨＨＴ_卸機能　　　　　　　　　　   *  ./
+/. *   JOB-ID      :    PTN01400                             *  ./
+/. *   JOB-NAME    :    _卸確定リスト発行　　　　　　　     *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PTN01400'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?P1       ,STRING*2,VALUE-'  '          /.倉庫ＣＤ  ./
+    VAR ?P2       ,STRING*2,VALUE-'  '          /.倉庫(代表)./
+    VAR ?P3       ,STRING*1,VALUE-' '           /.出力区分./
+    VAR ?P4       ,STRING*2,VALUE-'00'          /.倉庫(開始)./
+    VAR ?P5       ,STRING*2,VALUE-'00'          /.倉庫(終了)./
+    VAR ?P6       ,STRING*1,VALUE-'3'           /.帳票巣別./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+/.##実行PG名称ｾｯﾄ##./
+    ?PGNM := '_卸確定リスト発行'
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKELIBO/TOKMDLIB/ZAIEXCEL/TOKFLIB/TOKKLIB
+           /TOKDTLIB
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?P1,?P2)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0   THEN
+              ?KEKA4 :=  'ＷＳ－倉庫取得'
+              GOTO ABEND
+    END
+
+/.##_卸確定リスト発行指示##./
+STN0030I:
+
+    ?STEP :=   'STN0030I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    CALL      PGM-STN0030I.TOKSOLIB,PARA-(?P6,?P3,?P4,?P5)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+         IF   ?PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              RETURN
+         ELSE
+              ?KEKA4 :=  '_卸確定リスト発行指示'
+              GOTO ABEND
+         END
+    END
+    ?MSGX :=  '*出力区分＝　'  &&  ?P3
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '*倉庫開始＝　'  &&  ?P4
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '*倉庫終了＝　'  &&  ?P5
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##_卸確定リストデータ抽出##./
+STN0140B:
+
+    ?STEP :=   'STN0140B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-STN0140B.TOKSOLIB,PARA-(?P4,?P5)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC     =   4010 THEN
+              SNDMSG     '対象データなし',TO-XCTL
+              GOTO RTN
+    END
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '_卸確定リストデータ抽出'
+              GOTO ABEND
+    END
+    /.##出力区分判定##./
+    IF        ?P3  =  '1'  THEN
+              GOTO         PCNVDFTY
+    END
+
+
+/.##_卸確定リスト発行##./
+STN0150L:
+
+    ?STEP :=   'STN0150L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-STN0150L.TOKSOLIB
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '_卸確定リスト発行'
+              GOTO ABEND END
+    GOTO  RTN
+
+/.##_卸確定ＣＳＶデータ出力##./
+PCNVDFTY:
+
+    ?STEP :=   'PCNVDFTY'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CNVDF FILE-KKTANAW.TOKDTLIB,PATH-'/HGNAS/TANAOROSI/TANAOROSHI_KAKU I
+TEI.CSV',MODE-@EXP,ADD-@NO,ACTCHK-@NO,HEADLINE-@YES,EXTCNV-@YES
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '_卸確定リスト発行'
+              GOTO ABEND END
+    GOTO  RTN
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+
+ABEND:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRPRTF   FILE-PRTF,TOFILE-PRTF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリストを採取後、ＮＡＶへ連絡'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

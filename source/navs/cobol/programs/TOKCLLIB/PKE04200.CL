@@ -1,0 +1,299 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　本社システム                          *  ./
+/. *   SYSTEM-NAME :    検品システム　　                     *  ./
+/. *   JOB-ID      :    PKE04200                             *  ./
+/. *   JOB-NAME    :    棚卸確定データ取込　　　　　         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?FILNM    ,STRING*8,VALUE-'        '    /.ﾌｧｲﾙ名合併用./
+    VAR ?FILNMH   ,STRING*6,VALUE-'      '      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILNMK   ,STRING*6,VALUE-'      '      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?SNDFIN   ,STRING*6,VALUE-'      '      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILNMH1  ,STRING*6,VALUE-'RCVTAN'      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?LIBNM    ,STRING*8,VALUE-'TOKKPLIB'    /.ﾗｲﾌﾞﾗﾘ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILID    ,NAME                         /.ﾌｧｲﾙ名名前型./
+    VAR ?LIBID    ,NAME                         /.ﾗｲﾌﾞﾗﾘ名名前型./
+    VAR ?RCVTANA  ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?RCVTANAN ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PKE04200'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門CD./
+    VAR ?TANCD8   ,STRING*8,VALUE-'        '    /.担当者CD./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+    VAR ?JISOKO   ,STRING*2,VALUE-'00'          /.倉庫(自)  ./
+    VAR ?DSOKO    ,STRING*2,VALUE-'00'          /.倉庫(代表)./
+    VAR ?NO       ,STRING*1,VALUE-'7'           /.処理種別./
+    VAR ?KENSU    ,STRING*7,VALUE-'0000000'     /.抽出件数./
+    VAR ?HAKKBN   ,STRING*1,VALUE-' '           /.棚卸実績発行区分./
+    VAR ?OUTKBN   ,STRING*1,VALUE-' '           /.出力区分./
+    VAR ?TDATE    ,STRING*8,VALUE-'00000000'    /.取込日付./
+    VAR ?TTIME    ,STRING*6,VALUE-'000000'      /.取込時刻./
+    VAR ?SYORINM1 ,STRING*50
+    VAR ?SYORINM2 ,STRING*40
+    VAR ?OPR1     ,STRING*50                 /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?OPR2     ,STRING*50                 /.      2    ./
+    VAR ?OPR3     ,STRING*50                 /.      3    ./
+    VAR ?OPR4     ,STRING*50                 /.      4    ./
+    VAR ?OPR5     ,STRING*50                 /.      5    ./
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKKLIB/TOKDLIB/TOKDTLIB/TOKKPLIB
+
+/.##ログインユーザー情報取得##./
+STEP030:
+
+    ?STEP :=   'STEP030'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD8)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND
+    END
+    ?TANCD := ?TANCD8
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?JISOKO,?DSOKO)
+    IF        @PGMEC    ^=   0   THEN
+              GOTO ABEND
+    END
+
+/.##ﾌｧｲﾙ名称取得##./
+FILNMCHG:
+
+    ?FILNMH := ?FILNMH1
+    ?MSGX := '## 実行倉庫ｺｰﾄﾞ = ' && ?JISOKO && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?FILNMH && ?JISOKO    /.ﾃﾞﾌｫﾙﾄﾌｧｲﾙ名+倉庫CD./
+    ?FILID    :=    %NAME(?FILNM)         /.ﾌｧｲﾙ名名前型変換   ./
+    ?LIBID    :=    %NAME(?LIBNM)         /.ﾗｲﾌﾞﾗﾘ名名前型変換 ./
+    ?RCVTANA  :=    %NCAT(?FILID,?LIBID)  /.ﾌｧｲﾙ名.ﾗｲﾌﾞﾗﾘ名    ./
+    ?RCVTANAN :=    %STRING(?RCVTANA)
+    ?MSGX     :=    '## 倉庫ﾌｧｲﾙ名 = ' && ?RCVTANAN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##取込確認画面##./
+SHOM0900:
+
+    ?STEP :=  'SHOM0900'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    ?OPR1 := '＜　棚　卸　確　定　デ　ー　タ　取　込　　＞'
+    ?OPR2 := ''
+    ?OPR3 := '　　棚卸確定データの取り込みを行います。'
+    ?OPR4 := ''
+    ?OPR5 := '　　連携するデータは作成済ですか？'
+
+    CALL   OHOM0900.TOKELIB,
+           PARA-(?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+    ?PGMEC := @PGMEC
+    ?PGMEM := @PGMEM
+    IF        ?PGMEC ^= 0    THEN
+              GOTO   ABEND
+    END
+
+/.##ﾌｧｲﾙ排他##./
+
+    ?STEP :=   'ASSIGN'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ASSIGN    FILE-?RCVTANA!@XCL
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=  1020  THEN
+       IF     ?PGMEC    ^=   0    THEN
+              SNDMSG '他で連携処理が行われています',TOWS-@ORGWS
+              SNDMSG '棚卸確定データファイルロック',TOWS-@ORGWS
+              GOTO ABEND
+       END
+    END
+
+/.##データ転送##./
+PFEXPORT:
+
+    ?STEP :=   'PFEXPORT'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DLTFILE FILE-?RCVTANA
+    FEXPORT FILE-?RCVTANA,TYPE-@FILE,MODE-@CRT,PARA-KENPIN,UNIT-11
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+          IF  ?PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.##棚卸確定データ取込指示入力##./
+NKE0420I:
+
+    ?STEP :=   'NKE0420I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    OVRF      FILE-RCVTANXX,TOFILE-?RCVTANA
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-NKE0420I.TOKSOLIB,PARA-(?BUMON,?TANCD,?JISOKO,
+                                          ?HAKKBN,?OUTKBN,
+                                          ?TDATE,?TTIME)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+         IF   ?PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO RTN
+         ELSE
+              GOTO ABEND
+         END
+    END
+    SNDMSG ?BUMON,TO-XCTL
+    SNDMSG ?TANCD,TO-XCTL
+    SNDMSG ?JISOKO,TO-XCTL
+    SNDMSG ?HAKKBN,TO-XCTL
+    SNDMSG ?OUTKBN,TO-XCTL
+    SNDMSG ?TDATE,TO-XCTL
+    SNDMSG ?TTIME,TO-XCTL
+
+/.##棚卸確定データ取込##./
+NKE0430B:
+
+    ?STEP :=   'NKE0430B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-RCVTANXX,TOFILE-?RCVTANA
+    OVRF      FILE-RUITANL1,TOFILE-RUITANL1.TOKKPLIB
+    OVRF      FILE-ZTANADT1,TOFILE-ZTANADT1.TOKDTLIB
+    CALL      PGM-NKE0430B.TOKSOLIB,PARA-(?BUMON,?TANCD,?TDATE,?TTIME,
+                                          ?KENSU)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC     =   4010 THEN
+              GOTO RTN   END
+    IF        ?PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.##リスト出力先制御##./
+CHGSPLQ:
+
+    ?STEP :=  'CHGSPLQ '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CASE      ?OUTKBN   OF
+    /.レーザー./
+    /.現地./
+    /. #'1'#
+                  SNDMSG '＃本社レーザーへ出力　　　＃',
+                   TOWS-@ORGWS,JLOG-@YES,SLOG-@YES
+                  OVRPRTF FILE-XU04LP,TOFILE-????????.????????
+              END  ./                  /.↑実機設定に応じ変更./
+    /.社内./
+       #'1'#  OVRPRTF FILE-XU04LP,TOFILE-XU04LP.XUCL
+
+    /.連帳./                           /.↓実機はXU04LPでOK？./
+       #' '#  OVRPRTF FILE-XU04LP,TOFILE-XU04LP.XUCL
+    END
+
+/.##連携件数リスト##./
+NKE0900L:
+
+    ?STEP :=   'NKE0900L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-NKE0900L.TOKSOLIB,PARA-(?BUMON,?TANCD,?NO,?KENSU)
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.##棚卸実績リスト##./
+NKE0440L:
+
+    IF        ?HAKKBN   ^=  '1'   THEN
+              GOTO  RTN
+    END
+
+    ?STEP :=   'NKE0440L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  'SORTF-IN   ' && ?RCVTANAN && ' ##'
+
+    /. データＳＯＲＴ ./
+    SORTD  INFILE-?RCVTANA,
+           OUTFILE-?RCVTANA,
+           INRL-136,
+           INBF-30,
+           OUTRL-136,
+           OUTBF-30,
+           RCD-50,
+           SEQ-@YES,
+           KEY-1!7!DA,     /.棚卸_./
+           RCDL-@DSP
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              GOTO ABEND
+    END
+    ?MSGX :=  'SORTF-OUT  '
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-NKE0440L.TOKSOLIB,PARA-(?BUMON,?TANCD,?JISOKO,
+                                          ?TDATE,?TTIME)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+ABEND:
+
+ /. ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM  ./
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

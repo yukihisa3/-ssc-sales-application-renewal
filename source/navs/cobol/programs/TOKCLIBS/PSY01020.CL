@@ -1,0 +1,115 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    販売管理                             *  ./
+/. *   JOB-ID      :    PSSY0102                             *  ./
+/. *   JOB-NAME    :    手書伝票チェックリスト               *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSSY0102'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '
+    VAR       ?NYURK    ,STRING*8,VALUE-'00000000'
+    VAR       ?JIKANS   ,STRING*6,VALUE-'000000'
+    VAR       ?JIKANE   ,STRING*6,VALUE-'000000'
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB
+
+/.##部門ｺｰﾄﾞ取得##./
+SKY1602B:
+
+    ?STEP :=   'SKY1602B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1602B.TOKELIBO,PARA-(?WS,?BUMON)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+
+/.##手書伝票チェックリスト##./
+SSY0102L:
+
+/.  ?STEP :=   'SSY0102L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-SHTDENLH,TOFILE-SHTDENLH.TOKFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-SSY0102L.TOKELIBO,PARA-(?BUMON,?TANCD,?NYURK,
+                                          ?JIKANS,?JIKANE)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END ./
+/.##本社ﾚｰｻﾞｰへ出力##./
+    IF ?BUMON = '2920' THEN
+       OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+       OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+       OVRF      FILE-SHTDENLG,TOFILE-SHTDENLG.TOKFLIB
+       OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+       OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+       OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+       CALL      PGM-SSY0103L.TOKELIBO,PARA-(?BUMON,?TANCD,?NYURK,
+                                             ?JIKANS,?JIKANE)
+       IF        @PGMEC    ^=   0    THEN
+                 GOTO ABEND END
+    ELSE
+       OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIBO
+       OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+       OVRF      FILE-SHTDENLG,TOFILE-SHTDENLG.TOKFLIB
+       OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+       OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+       OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+       CALL      PGM-SSY0102L.TOKELIBO,PARA-(?BUMON,?TANCD,?NYURK,
+                                             ?JIKANS,?JIKANE)
+       IF        @PGMEC    ^=   0    THEN
+                 GOTO ABEND END
+    END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

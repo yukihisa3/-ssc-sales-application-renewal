@@ -1,0 +1,76 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    サンデー支払照合                     *  ./
+/. *   JOB-ID      :    PSI77020                              *  ./
+/. *   JOB-NAME    :    サンデー支払明細書発行　             *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSI77020'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                    /.      5    ./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+     DEFLIBL   TOKFLIB/TOKELIB/TOKKLIB
+
+/.##ＳＯＲＴ##./
+SORT1:
+/.ＳＯＲＴ順：店舗＋計上日＋伝票番号./
+    ?STEP :=  'SORT1   '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    SORT      INFILE-SITGKFS.TOKKLIB,INRL-64,INBF-63,
+              OUTFILE-SITGKFS.TOKKLIB,OUTBF-63,
+              KEY-28!5!CA,KEY1-39!4!CA,KEY2-10!7!CA,
+              RCDL-@DSP
+
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+SSI7702L: /.##支払明細書発行##./
+
+    ?STEP :=   'SSI7702L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRPRTF FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+    CALL     PGM-SSI7702L.TOKELIBO
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

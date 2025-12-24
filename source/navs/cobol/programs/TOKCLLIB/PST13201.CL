@@ -1,0 +1,341 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　　　　　　　　　　　　　　　          *  ./
+/. *   SYSTEM-NAME :    コーナンＥＤＩ                  　   *  ./
+/. *   JOB-ID      :    PSY13201                             *  ./
+/. *   JOB-NAME    :    箱数ファイル（手書）作成（東日本用） *  ./
+/. *   MENU        :    XXXXXXXX-XX                          *  ./
+/. *   CREATE      :    2021.09.15 S22470090                 *  ./
+/. *   流用　　    :    PSY12200                             *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PSY13201'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8,VALUE-'        '    /.STEP-ID./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門CD./
+    VAR ?TANCD8   ,STRING*8,VALUE-'        '    /.担当者CD./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+    VAR ?JDATE    ,STRING*8,VALUE-'00000000'    /.受信日付  ./
+    VAR ?JTIME    ,STRING*4,VALUE-'0000'        /.受信時間  ./
+    VAR ?JTORI    ,STRING*8,VALUE-'00023631'    /.受信取引先./
+    VAR ?SOKCD    ,STRING*2,VALUE-'00'          /.倉庫(自)  ./
+    VAR ?DSOKCD   ,STRING*2,VALUE-'00'          /.倉庫(代表)./
+    VAR ?OSOKCD   ,STRING*2,VALUE-'00'          /.倉庫(指示)./
+    VAR ?CENTERF  ,STRING*5,VALUE-'00000'       /.センター(FROM)./
+    VAR ?CENTERT  ,STRING*5,VALUE-'00000'       /.センター(TO)  ./
+    VAR ?ROUTEF   ,STRING*2,VALUE-'00'          /.ルート　(FROM)./
+    VAR ?ROUTET   ,STRING*2,VALUE-'00'          /.ルート　(TO   ./
+    VAR ?BUMONF   ,STRING*2,VALUE-'00'          /.部門　　(FROM)./
+    VAR ?BUMONT   ,STRING*2,VALUE-'00'          /.部門　　(TO  )./
+    VAR ?HDATE    ,STRING*8,VALUE-'00000000'    /.発注日./
+    VAR ?NDATE    ,STRING*8,VALUE-'00000000'    /.納品日./
+    VAR ?TANAF    ,STRING*6,VALUE-'00000'       /._番　　(FROM)./
+    VAR ?TANAT    ,STRING*6,VALUE-'00000'       /._番　　(TO  )./
+    VAR ?DELFLG   ,STRING*1,VALUE-' '           /.削除有無ＦＬＧ./
+    VAR ?KENSU    ,STRING*7,VALUE-'0000000'     /.作成件数./
+    VAR ?SYORINM1 ,STRING*40
+    VAR ?SYORINM2 ,STRING*50
+    VAR ?SYORINM3 ,STRING*50
+    VAR ?SYORIKN1 ,STRING*7,VALUE-'0000000'
+    VAR ?SYORIKN2 ,STRING*7,VALUE-'0000000'
+    VAR ?SYORIKN3 ,STRING*7,VALUE-'0000000'
+    VAR ?SYORIKN4 ,STRING*7,VALUE-'0000000'
+    VAR ?SYORIKN5 ,STRING*7,VALUE-'0000000'
+    VAR ?PGNM     ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                  /.      2    ./
+    VAR ?KEKA2    ,STRING*40                  /.      3    ./
+    VAR ?KEKA3    ,STRING*40                  /.      4    ./
+    VAR ?KEKA4    ,STRING*40                  /.      5    ./
+    VAR ?P1       ,STRING*02,VALUE-'00'
+    VAR ?P2       ,STRING*08,VALUE-'00000000'
+    VAR ?P3       ,STRING*09,VALUE-'000000000'
+    VAR ?P4       ,STRING*09,VALUE-'000000000'
+    VAR ?P5       ,STRING*08,VALUE-'00000000'
+    VAR ?P6       ,STRING*09,VALUE-'000000000'
+    VAR ?P7       ,STRING*09,VALUE-'000000000'
+    VAR ?P8       ,STRING*08,VALUE-'00000000'
+    VAR ?P9       ,STRING*09,VALUE-'000000000'
+    VAR ?P10      ,STRING*09,VALUE-'000000000'
+    VAR ?P11      ,STRING*08,VALUE-'00000000'
+    VAR ?P12      ,STRING*09,VALUE-'000000000'
+    VAR ?P13      ,STRING*09,VALUE-'000000000'
+    VAR ?P14      ,STRING*08,VALUE-'00000000'
+    VAR ?P15      ,STRING*09,VALUE-'000000000'
+    VAR ?P16      ,STRING*09,VALUE-'000000000'
+    VAR ?P17      ,STRING*08,VALUE-'00000000'
+    VAR ?P18      ,STRING*09,VALUE-'000000000'
+    VAR ?P19      ,STRING*09,VALUE-'000000000'
+    VAR ?P20      ,STRING*08,VALUE-'00000000'
+    VAR ?P21      ,STRING*09,VALUE-'000000000'
+    VAR ?P22      ,STRING*09,VALUE-'000000000'
+    VAR ?P23      ,STRING*08,VALUE-'00000000'
+    VAR ?P24      ,STRING*09,VALUE-'000000000'
+    VAR ?P25      ,STRING*09,VALUE-'000000000'
+    VAR ?P26      ,STRING*08,VALUE-'00000000'
+    VAR ?P27      ,STRING*09,VALUE-'000000000'
+    VAR ?P28      ,STRING*09,VALUE-'000000000'
+    VAR ?P29      ,STRING*08,VALUE-'00000000'
+    VAR ?P30      ,STRING*09,VALUE-'000000000'
+    VAR ?P31      ,STRING*09,VALUE-'000000000'
+    VAR ?P32      ,STRING*08,VALUE-'00000000'
+    VAR ?P33      ,STRING*09,VALUE-'000000000'
+    VAR ?P34      ,STRING*09,VALUE-'000000000'
+    VAR ?P35      ,STRING*08,VALUE-'00000000'
+    VAR ?P36      ,STRING*09,VALUE-'000000000'
+    VAR ?P37      ,STRING*09,VALUE-'000000000'
+    VAR ?P38      ,STRING*02,VALUE-'00'
+    VAR ?OPR1     ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?OPR2     ,STRING*50                  /.      2    ./
+    VAR ?OPR3     ,STRING*50                  /.      3    ./
+    VAR ?OPR4     ,STRING*50                  /.      4    ./
+    VAR ?OPR5     ,STRING*50                  /.      5    ./
+
+/.##実行PG名称ｾｯﾄ##./
+    ?PGNM := '箱数ファイル（手書）作成'
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKELIBO/TOKSOLIB/TOKFLIB/TOKKLIB/TOKDTLIB/
+            TOKMDLIB
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.## ログインユーザー情報取得 ##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD8)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ログインユーザー情報取得'
+              GOTO ABEND
+    END
+    ?TANCD := ?TANCD8
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?SOKCD,?DSOKCD)
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  'ＷＳ－倉庫取得'
+              GOTO ABEND
+    END
+    ?P1       :=    ?SOKCD
+    ?P38      :=    ?DSOKCD
+
+/.##手書伝票データ抽出指示入力##./
+PSSY0019:
+
+    ?STEP :=   'PSSY0019'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    CALL      PGM-SSY0015I.TOKELIB,PARA-(?P1,
+              ?P2,?P3,?P4,?P5,?P6,?P7,?P8,?P9,?P10,
+              ?P11,?P12,?P13,?P14,?P15,?P16,?P17,?P18,?P19,
+              ?P20,?P21,?P22,?P23,?P24,?P25,?P26,?P27,?P28,
+              ?P29,?P30,?P31,?P32,?P33,?P34,?P35,?P36,?P37,?P38)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+         IF   ?PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO RTN
+         ELSE
+              ?KEKA4 :=  '【手書伝票データ抽出指示入力】'
+              GOTO ABEND
+         END
+    END
+    ?OSOKCD   :=    ?P1
+
+/.##出力ファイル排他##./
+PASSIGN:
+
+    ?STEP :=   'PASSIGN '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    ASSIGN FILE-JHTTEGKN.TOKDTLIB!@XCL
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF     ?PGMEC  ^=    0    THEN
+           GOTO  CHK
+    END
+
+/.##手書伝票データ抽出##./
+SSY0016B:
+
+    ?STEP :=   'SSY0016B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-SHTDENLC,TOFILE-SHTDENLC.TOKFLIB
+    OVRF      FILE-JHTDENF,TOFILE-JHTTEGKN.TOKDTLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-SHOTBL2,TOFILE-SHOTBL2.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    CALL      PGM-SSY0016B.TOKELIBO,PARA-(?P1,
+              ?P2,?P3,?P4,?P5,?P6,?P7,?P8,?P9,?P10,
+              ?P11,?P12,?P13,?P14,?P15,?P16,?P17,?P18,?P19,
+              ?P20,?P21,?P22,?P23,?P24,?P25,?P26,?P27,?P28,
+              ?P29,?P30,?P31,?P32,?P33,?P34,?P35,?P36,?P37)
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【手書伝票データ抽出】'
+              GOTO ABEND END
+    /. データＳＯＲＴ./
+    SORTF  INFILE-JHTTEGKN.TOKDTLIB,
+           OUTFILE-JHTTEGKN.TOKDTLIB,
+           KEY-'F07!A',
+           KEY1-'F01!A',
+           KEY2-'F131!A',
+           KEY3-'F111!A',
+           KEY4-'F112!A',
+           SELECT-'F01!EQ!#00023631',
+      /.   SELECT-'F01!EQ!?JTORI',      ./
+           RCDL-@DSP
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【ＳＯＲＴ処理】'
+              GOTO ABEND
+    END
+    ?MSGX :=  'SORTF-OUT  '
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+
+/.##バッチ_採番処理##./
+SJH8999B:
+
+    ?STEP :=   'SJH8999B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL  SJH8999B.TOKELIBO,PARA-(?JDATE,?JTIME)
+    IF      @PGMEC    ^=   0    THEN
+            ?KEKA4 := '【バッチ_採番処理】'
+            GOTO ABEND
+    END
+
+/.##バッチ_採番リスト##./
+SSY1292L:
+
+    ?STEP :=   'SSY1292L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL  SSY1292L.TOKSOLIB,PARA-(?BUMON,?TANCD,?JDATE,?JTIME,
+                                  '00023631')
+    IF      @PGMEC    ^=   0    THEN
+            ?KEKA4 := '【バッチ_採番リスト】'
+            GOTO ABEND
+    END
+
+/.##箱数ファイル（手書）作成##./
+SSY1321B:
+
+    ?STEP :=   'SSY1321B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JHTTEGKN,TOFILE-JHTTEGKN.TOKDTLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-KTHAKOL1,TOFILE-KTHAKOL1.TOKDTLIB
+    CALL      PGM-SSY1321B.TOKSOLIB,
+              PARA-(?BUMON,?TANCD,?JDATE,?JTIME,?JTORI,?OSOKCD)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '箱数ファイル作成（手書）'
+              GOTO ABEND
+    END
+
+/.##箱数ファイル作成リスト発行##./
+SSY1370L:
+
+    ?STEP :=   'SSY1370L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF FILE-KNHAKOL3,TOFILE-KTHAKOL3.TOKDTLIB
+    CALL      PGM-SSY1370L.TOKSOLIB,
+              PARA-(?JDATE,?JTIME,?JTORI,?OSOKCD,?NDATE)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '箱数ファイル作成リスト発行'
+              GOTO ABEND
+    END
+
+RTN:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  ''
+    ?KEKA3 :=  ''
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                     ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリストを採取後、ＮＡＶへ連絡'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+
+/.#################################################################./
+/.##資源使用時、他端末開放確認メッセージ出力）                   ##./
+/.#################################################################./
+CHK:  /.資源の解放./
+
+    ?OPR1  :=  '　　＃＃＃＃＃＃＃　資源使用中　＃＃＃＃＃＃＃　　'
+    ?OPR2  :=  '　　　　　　　　　　　　　　　　　　　　　　　　　'
+    ?OPR3  :=  '　　他端末にて資源を使用中です。　　　　　　　　　'
+    ?OPR4  :=  '　　全端末の使用状況を確認して下さい。　　　　　　'
+    ?OPR5  :=  '　ＥＮＴＥＲでリスタート，ＰＦ９でプログラム終了　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    GOTO      PASSIGN

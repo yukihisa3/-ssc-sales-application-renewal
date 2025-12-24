@@ -1,0 +1,85 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　出荷検品システム（本社システム）      *  ./
+/. *   SYSTEM-NAME :    出荷検品システム　　　　　　　　　　 *  ./
+/. *   JOB-ID      :    PKE03000                             *  ./
+/. *   JOB-NAME    :    ケーヨー送信ＤＴ作成処理             *  ./
+/. ***********************************************************  ./
+    PGM
+
+    VAR   ?WS    ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR   ?WKSTN ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR   ?PGMEC ,INTEGER
+    VAR   ?PGMECX,STRING*11
+    VAR   ?PGMEM ,STRING*99
+    VAR   ?MSG   ,STRING*99(6)
+    VAR   ?MSGX  ,STRING*99
+    VAR   ?PGMID ,STRING*8,VALUE-'PKE03000'
+    VAR   ?STEP  ,STRING*8
+    VAR   ?PGNM    ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR   ?KEKA1   ,STRING*40                  /.      2    ./
+    VAR   ?KEKA2   ,STRING*40                  /.      3    ./
+    VAR   ?KEKA3   ,STRING*40                  /.      4    ./
+    VAR   ?KEKA4   ,STRING*40                  /.      5    ./
+    VAR   ?OPR1    ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR   ?OPR2    ,STRING*50                  /.      2    ./
+    VAR   ?OPR3    ,STRING*50                  /.      3    ./
+    VAR   ?OPR4    ,STRING*50                  /.      4    ./
+    VAR   ?OPR5    ,STRING*50                  /.      5    ./
+    VAR   ?CHK     ,STRING*1,VALUE-' '         /.送信ﾁｪｯｸFｸﾘｱ./
+
+    DEFLIBL TOKELIB/TOKKLIB
+/.##フバサミクレー送信キーファイル抽出##./
+KEYDATA1:
+
+    ?STEP :=   'KEYDATA1'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-SNDFINF,TOFILE-SNDFINDT.TOKKLIB
+    OVRF      FILE-KENSOKF,TOFILE-KENSOKL2.TOKKLIB
+    CALL      PGM-SKE0850B.TOKELIB,PARA-('63')
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4  :=  '【フバサミ送信キー抽出】'
+              GOTO ABEND
+    ELSE
+              CNVFILE FILE-SNDFINDT.TOKKLIB,
+                      TOFILE-SNDFIN63.TOKFLIB,BF-81
+              IF   @PGMEC    ^=   0   THEN
+                   ?KEKA4  :=  '【フバサミ送信キーＣＰ】'
+                   GOTO ABEND
+              END
+    END
+RTN: /.##ﾌﾟﾛｸﾞﾗﾑ正常時、終了ﾒｯｾｰｼﾞ##./
+
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  '更新結果等を確認して下さい。'
+    ?KEKA3 :=  ''
+    ?KEKA4 :=  '確認後、ケーヨーＤＴ送信開始！！'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:/.##ﾌﾟﾛｸﾞﾗﾑ異常終了時、終了ﾒｯｾｰｼﾞ##./
+
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

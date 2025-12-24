@@ -1,0 +1,163 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    ＤＣＭＪＡＰＡＮ　物品受領書         *  ./
+/. *   JOB-ID      :    PSY87500                             *  ./
+/. *   JOB-NAME    :    ＤＣＭＪＡＰＡＮ　物品受領書         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PSY87500'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+    VAR ?P1       ,STRING*8,VALUE-'00000000'    /.取引先CD./
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB/TOKELIBO
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  'ＤＣＭＪＡＰＡＮ物品受領書発行'
+
+    CLRFILE DCMJYUF.TOKKLIB
+
+/.##取引先コード入力画面##./
+SSY8730I:
+
+    ?STEP :=   'SSY8730I '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    CALL      PGM-SSY8730I.TOKELIBO,PARA-(?P1)
+    IF        @PGMEC    ^=   0    THEN
+         IF   @PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              RETURN
+         ELSE
+              ?KEKA4 :=  '抽出条件入力'
+              GOTO ABEND
+         END
+    END
+
+/.##受信ファイル⇒物品受領書Ｆ作成##./
+SSY8731B:
+
+    ?STEP :=   'SSY8731B '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ?MSGX :=  '***  TORICD = '  && ?P1   &&   '  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.#ホーマック北海道資材#./
+    IF        ?P1  =  '00000883' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCAFILEA.ONLBLIB
+    END
+/.#ホーマック東北資材#./
+    IF        ?P1  =  '00000882' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCAFILEB.ONLBLIB
+    END
+/.#ホーマック関東資材#./
+    IF        ?P1  =  '00000880' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCAFILEC.ONLBLIB
+    END
+/.#ホーマック北海道植物#./
+    IF        ?P1  =  '00014273' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCAFILEE.ONLBLIB
+    END
+/.#ホーマック東北植物#./
+    IF        ?P1  =  '00014272' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCAFILEF.ONLBLIB
+    END
+/.#ホーマック関東植物#./
+    IF        ?P1  =  '00001427' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCAFILEG.ONLBLIB
+    END
+/.#カーマ資材#./
+    IF        ?P1  =  '00013938' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCAKAMAA.ONLBLIB
+    END
+/.#カーマ植物#./
+    IF        ?P1  =  '00017137' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCAKAMAB.ONLBLIB
+    END
+/.#ダイキ資材100403#./
+    IF        ?P1  =  '00100403' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCADAIK1.ONLBLIB
+    END
+/.#ダイキ資材100441##./
+    IF        ?P1  =  '00100441' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCADAIK2.ONLBLIB
+    END
+/.#ダイキ資材100427##./
+    IF        ?P1  =  '00100427' THEN
+              OVRF    FILE-CVCSG001,TOFILE-JCADAIK3.ONLBLIB
+    END
+    OVRF      FILE-DCMJYUL1,TOFILE-DCMJYUL1.TOKKLIB
+    CALL      PGM-SSY8731B.TOKELIBO,PARA-(?P1)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【受信ＤＴ⇒物品受領ＤＴ作成】'
+              GOTO ABEND END
+
+/.##ＤＣＭＪＡＰＡＮ物品受領書発行##./
+SSY8732L:
+
+    ?STEP :=   'SSY8732L '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-DCMJYUL2,TOFILE-DCMJYUL2.TOKKLIB
+    CALL      PGM-SSY8732L.TOKELIBO,PARA-(?P1)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【ＤＣＭＪＡＰＡＮ物品受領書発行】'
+              GOTO ABEND END
+
+RTN:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  '発行したリストを確認して下さい。'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC

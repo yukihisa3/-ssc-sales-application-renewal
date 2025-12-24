@@ -1,0 +1,92 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME : ＳＯＳ処理                              *  ./
+/. *   JOB-ID      : POS02300                                *  ./
+/. *   JOB-NAME    : 自動赤黒データ作成処理                 *  ./
+/. ***********************************************************  ./
+    PGM       (PARA-?PARA)
+    PARA      ?PARA     ,STRING*8,IN,VALUE-'00000000'
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'POS02300'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?PGNM     ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                  /.      5    ./
+    VAR       ?OPR1     ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                  /.      2    ./
+    VAR       ?OPR3     ,STRING*50                  /.      3    ./
+    VAR       ?OPR4     ,STRING*50                  /.      4    ./
+    VAR       ?OPR5     ,STRING*50                  /.      5    ./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ?PGNM :=  '自動赤黒データ作成処理'
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB
+
+    ?OPR1  :=  '　＃＃＃＃＃＃＃　　ＳＯＳ処理　　＃＃＃＃＃＃＃　'
+    ?OPR2  :=  '　ホーマーグリーンの赤黒データを作成します。'
+    ?OPR3  :=  '　確認して下さい。'
+    ?OPR4  :=  ''
+    ?OPR5  :=  '　＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+SOS0230B: /.##　赤黒データ作成処理　##./
+
+    ?STEP := 'SOS0230B'
+    ?MSGX :=  '***   '  && ?STEP  &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF FILE-SHTDENL1,TOFILE-SHTDENL1.TOKFLIB
+    OVRF FILE-AKADENF,TOFILE-AKADENF.TOKFLIB
+    CALL SOS0230B.TOKELIB
+    IF   @PGMEC      ^=  0
+          THEN ?KEKA4 :=  '赤黒データ作成中'
+               GOTO     ABEND
+    END
+
+RTN:
+
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  '更新結果等を確認して下さい。'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

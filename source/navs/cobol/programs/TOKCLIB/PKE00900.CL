@@ -1,0 +1,106 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    出荷検品サブシステム                 *  ./
+/. *   JOB-ID      :    PKE00900                             *  ./
+/. *   JOB-NAME    :    商品変換ＴＢＬ出荷検品用送信Ｄ作成   *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PKE00900'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##出荷検品用商品変換テーブル##./
+SKE0090B:
+
+    ?STEP :=   'SKE0090B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-SOKKENL1,TOFILE-SOKKENL1.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-SHOTBL3,TOFILE-SHOTBL3.TOKFLIB
+    OVRF      FILE-KNPTAN01,TOFILE-KNPTAN01.TOKWLIB
+    OVRF      FILE-KNPTAN02,TOFILE-KNPTAN62.TOKFLIB
+    OVRF      FILE-KNPTAN03,TOFILE-KNPTAN63.TOKFLIB
+    OVRF      FILE-KNPTAN04,TOFILE-KNPTAN04.TOKWLIB
+    OVRF      FILE-KNPTAN05,TOFILE-KNPTAN05.TOKWLIB
+    OVRF      FILE-KNPTAN06,TOFILE-KNPTAN06.TOKWLIB
+    OVRF      FILE-KNPTAN07,TOFILE-KNPTAN07.TOKWLIB
+    OVRF      FILE-KNPTAN08,TOFILE-KNPTAN08.TOKWLIB
+    OVRF      FILE-KNPTAN09,TOFILE-KNPTAN09.TOKWLIB
+    OVRF      FILE-KNPTAN10,TOFILE-KNPTAN10.TOKWLIB
+    OVRF      FILE-KNPTAN11,TOFILE-KNPTAN11.TOKWLIB
+    OVRF      FILE-KNPTAN12,TOFILE-KNPTAN12.TOKWLIB
+    OVRF      FILE-KNPTAN13,TOFILE-KNPTAN13.TOKWLIB
+    OVRF      FILE-KNPTAN14,TOFILE-KNPTAN14.TOKWLIB
+    OVRF      FILE-KNPTAN15,TOFILE-KNPTAN15.TOKWLIB
+    OVRF      FILE-KNPTAN16,TOFILE-KNPTAN16.TOKWLIB
+    OVRF      FILE-KNPTAN17,TOFILE-KNPTAN17.TOKWLIB
+    OVRF      FILE-KNPTAN18,TOFILE-KNPTAN18.TOKWLIB
+    OVRF      FILE-KNPTAN19,TOFILE-KNPTAN19.TOKWLIB
+    OVRF      FILE-KNPTAN20,TOFILE-KNPTAN20.TOKWLIB
+    OVRF      FILE-KNPTAK01,TOFILE-KNPTAK01.TOKWLIB
+    OVRF      FILE-KNPTAK02,TOFILE-KNPTAK62.TOKFLIB
+    OVRF      FILE-KNPTAK03,TOFILE-KNPTAK63.TOKFLIB
+    OVRF      FILE-KNPTAK04,TOFILE-KNPTAK04.TOKWLIB
+    OVRF      FILE-KNPTAK05,TOFILE-KNPTAK05.TOKWLIB
+    OVRF      FILE-KNPTAK06,TOFILE-KNPTAK06.TOKWLIB
+    OVRF      FILE-KNPTAK07,TOFILE-KNPTAK07.TOKWLIB
+    OVRF      FILE-KNPTAK08,TOFILE-KNPTAK08.TOKWLIB
+    OVRF      FILE-KNPTAK09,TOFILE-KNPTAK09.TOKWLIB
+    OVRF      FILE-KNPTAK10,TOFILE-KNPTAK10.TOKWLIB
+    OVRF      FILE-KNPTAK11,TOFILE-KNPTAK11.TOKWLIB
+    OVRF      FILE-KNPTAK12,TOFILE-KNPTAK12.TOKWLIB
+    OVRF      FILE-KNPTAK13,TOFILE-KNPTAK13.TOKWLIB
+    OVRF      FILE-KNPTAK14,TOFILE-KNPTAK14.TOKWLIB
+    OVRF      FILE-KNPTAK15,TOFILE-KNPTAK15.TOKWLIB
+    OVRF      FILE-KNPTAK16,TOFILE-KNPTAK16.TOKWLIB
+    OVRF      FILE-KNPTAK17,TOFILE-KNPTAK17.TOKWLIB
+    OVRF      FILE-KNPTAK18,TOFILE-KNPTAK18.TOKWLIB
+    OVRF      FILE-KNPTAK19,TOFILE-KNPTAK19.TOKWLIB
+    OVRF      FILE-KNPTAK20,TOFILE-KNPTAK20.TOKWLIB
+    CALL      PGM-SKE0090B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

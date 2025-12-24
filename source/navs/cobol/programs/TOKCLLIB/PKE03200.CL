@@ -1,0 +1,182 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　本社システム                          *  ./
+/. *   SYSTEM-NAME :    検品システム　　                     *  ./
+/. *   JOB-ID      :    PKE03200                             *  ./
+/. *   JOB-NAME    :    返品検品結果確認リスト発行　         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?FILNM    ,STRING*8,VALUE-'        '    /.ﾌｧｲﾙ名合併用./
+    VAR ?FILNMH   ,STRING*6,VALUE-'      '      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILNMK   ,STRING*6,VALUE-'      '      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?SNDFIN   ,STRING*6,VALUE-'      '      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILNMH1  ,STRING*6,VALUE-'SNDXXX'      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILNMH2  ,STRING*6,VALUE-'SNDYYY'      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?LIBNM    ,STRING*8,VALUE-'TOKKPLIB'    /.ﾗｲﾌﾞﾗﾘ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILID    ,NAME                         /.ﾌｧｲﾙ名名前型./
+    VAR ?LIBID    ,NAME                         /.ﾗｲﾌﾞﾗﾘ名名前型./
+    VAR ?SNDNYK   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDNYKN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?SNDNKK   ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?SNDNKKN  ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PKE03200'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?BUMON    ,STRING*4,VALUE-'    '        /.部門CD./
+    VAR ?TANCD8   ,STRING*8,VALUE-'        '    /.担当者CD./
+    VAR ?TANCD    ,STRING*2,VALUE-'  '          /.担当者CD./
+    VAR ?JISOKO   ,STRING*2,VALUE-'00'          /.倉庫(自)  ./
+    VAR ?DSOKO    ,STRING*2,VALUE-'00'          /.倉庫(代表)./
+    VAR ?SIJISOKO ,STRING*2,VALUE-'00'          /.指示倉庫  ./
+    VAR ?NO       ,STRING*1,VALUE-'6'           /.処理種別./
+    VAR ?KENSU    ,STRING*7,VALUE-'0000000'     /.抽出件数./
+    VAR ?KENSU1   ,STRING*7,VALUE-'0000000'     /.抽出件数./
+    VAR ?SYORINM1 ,STRING*50
+    VAR ?SYORINM2 ,STRING*40
+    VAR ?HACKBN   ,STRING*1,VALUE-' '           /.発注区分./
+    VAR ?FDATE    ,STRING*8,VALUE-'00000000'    /.開始日付./
+    VAR ?TDATE    ,STRING*8,VALUE-'00000000'    /.終了日付./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '返品検品結果確認リスト発行'
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKKLIB/TOKDLIB/TOKDTLIB/TOKKPLIB
+
+/.##ログインユーザー情報取得##./
+STEP030:
+
+    ?STEP :=   'STEP030'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD8)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【ログインユーザー情報取得】'
+              GOTO ABEND
+    END
+    ?TANCD := ?TANCD8
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?JISOKO,?DSOKO)
+    IF        @PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '【倉庫コード取得】'
+              GOTO ABEND
+    END
+
+/.##返品検品結果確認リスト発行指示##./
+NKE0320I:
+
+    ?STEP :=   'NKE0320I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    CALL      PGM-NKE0320I.TOKSOLIB,PARA-(?BUMON,?TANCD,?JISOKO,?DSOKO,
+                                          ?SIJISOKO,
+                                          ?FDATE,?TDATE,?HACKBN)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+         IF   ?PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO RTN
+         ELSE
+              ?KEKA4 :=  '【返品検品結果確認リスト発行指示】'
+              GOTO ABEND
+         END
+    END
+
+    ?MSGX  :=  '?BUMON   =' && ?BUMON
+     SNDMSG ?MSGX,TO-XCTL
+    ?MSGX  :=  '?TANCD   =' && ?TANCD
+     SNDMSG ?MSGX,TO-XCTL
+    ?MSGX  :=  '?JISOKO  =' && ?JISOKO
+     SNDMSG ?MSGX,TO-XCTL
+    ?MSGX  :=  '?DSOKO   =' && ?DSOKO
+     SNDMSG ?MSGX,TO-XCTL
+    ?MSGX  :=  '?SIJISOKO=' && ?SIJISOKO
+     SNDMSG ?MSGX,TO-XCTL
+    ?MSGX  :=  '?FDATE   =' && ?FDATE
+     SNDMSG ?MSGX,TO-XCTL
+    ?MSGX  :=  '?TDATE   =' && ?TDATE
+     SNDMSG ?MSGX,TO-XCTL
+    ?MSGX  :=  '?HACKBN  =' && ?HACKBN
+     SNDMSG ?MSGX,TO-XCTL
+
+/.##返品検品結果確認リスト発行##./
+NKE0330L:
+
+    ?STEP :=   'NKE0330L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL      PGM-NKE0330L.TOKSOLIB,PARA-(?BUMON,?TANCD,?SIJISOKO,
+                                          ?FDATE,?TDATE)
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【返品検品結果確認リスト発行】'
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+ABEND:
+
+ /. ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM  ./
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '返品検品データ取込が異常終了しました'
+    ?KEKA2 :=  'ログを採取してＮＡＶへ連絡した下さい'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

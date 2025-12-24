@@ -1,0 +1,156 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    本田オンラインシステム（Ｊ本田　新） *  ./
+/. *   JOB-ID      :    PSE71141                             *  ./
+/. *   JOB-NAME    :    配信ファイル作成（ジョイフル本田）   *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSE71141'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?JBNM     ,STRING*24!MIXED            /.業務漢字名 ./
+    VAR       ?JBID     ,STRING*10                  /.業務ＩＤ   ./
+    VAR       ?PGNM1    ,STRING*24!MIXED            /.ＰＧ漢字名 ./
+    VAR       ?PGID     ,STRING*10                  /.ＰＧＩＤ　 ./
+/.-----------------------------------------------------------./
+    VAR       ?CLID     ,STRING*8                   /.ＣＬＩＤ   ./
+    VAR       ?MSG1     ,STRING*80                  /.開始終了MSG./
+    VAR       ?OPR1     ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                  /.      2    ./
+    VAR       ?OPR3     ,STRING*50                  /.      3    ./
+    VAR       ?OPR4     ,STRING*50                  /.      4    ./
+    VAR       ?OPR5     ,STRING*50                  /.      5    ./
+    VAR       ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                    /.      5    ./
+    VAR       ?SYORINM1 ,STRING*40
+    VAR       ?SYORINM2 ,STRING*50
+    VAR       ?SYORINM3 ,STRING*50
+    VAR       ?SYORIKN1 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN2 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN3 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN4 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN5 ,STRING*7,VALUE-'0000000'
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  'ジョイフル本田　ＰＣ請求送信ＤＴ作成'
+    ?SYORINM1 :=  'ジョイフル本田　ＰＣ請求送信ＤＴ作成'
+
+/.##ライブラリリスト##./
+    DEFLIBL TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO/TOKDLIB
+/.  本田請求送信データ作成画面起動                          ./
+STEP00:
+    ?JBID    :=   'PSE71141'
+    ?CLID    :=   'PSE71141'
+    ?MSG1    := '<<< ' && ?CLID && ' START '
+               && %SBSTR(@SDATEY,1,2) && '/'
+               && %SBSTR(@SDATEY,3,2) && '/'
+               && %SBSTR(@SDATEY,5,2) && ' '
+               && %SBSTR(@STIME,1,2)  && ':'
+               && %SBSTR(@STIME,3,2)  && ':'
+               && %SBSTR(@STIME,5,2)  && ' >>>'
+     SNDMSG  MSG-?MSG1,TOWS-@ORGWS,JLOG-@YES
+
+    ?OPR1  :=  '＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃'
+    ?OPR2  :=  '　本田殿請求配信データの作成を行います。'
+    ?OPR3  :=  '　確認して下さい。（新）'
+    ?OPR4  :=  '　終了後、ＰＣより送信処理を行って下さい。'
+    ?OPR5  :=  '＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##配信ファイル作成##./
+SSE7107B:
+
+    ?STEP :=   'SSE7107B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JHJSEKL1,TOFILE-JHJSEKL1.TOKDLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-CVCSF,TOFILE-JOYFULSD.TOKKLIB
+    CALL      PGM-SSE7117B.TOKELIBO,PARA-(?SYORIKN1)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC ^=   0    THEN
+              ?KEKA4 :=  '【請求配信Ｆ作成】'
+              GOTO ABEND END
+
+/.##128=>256変換##./
+CVCS2561:
+
+    ?STEP :=   'CVCS2561'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-CVCS256,TOFILE-JOYFULSS.ONLBLIB
+    OVRF      FILE-CVCS128,TOFILE-JOYFULSD.TOKKLIB
+    CALL      PGM-CVCS2561.TOKELIBO,PARA-(?SYORIKN2)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC ^=   0    THEN
+              ?KEKA4 :=  '【１２８_２５６変換】'
+              GOTO ABEND END
+
+    SNDMSG MSG-'＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃',TO-XCTL
+    SNDMSG MSG-'＃　本田殿請求配信データの作　＃',TO-XCTL
+    SNDMSG MSG-'＃成処理が完了しました。　　　＃',TO-XCTL
+    SNDMSG MSG-'＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃',TO-XCTL
+
+RTN:
+
+    ?KEKA1 :=  'ジョイフル本田ＰＣ請求送信データの作成が'
+    ?KEKA2 :=  '完了しました。'
+    ?KEKA3 :=  'ＰＣより，送信処理を行って下さい。'
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+                /.１２３４５６７８９０１２３４５６７８９０１２３４./
+    ?SYORINM2 := '送信用請求データ作成が正常終了しました。　　　　'
+    ?SYORINM3 := '件数１：送信対象件数　件数２：実送信件数'
+    OVRPRTF FILE-PRTF,TOFILE-PRTFILE.TOKELIBO,
+            MEDLIB-TOKELIBO
+    CALL SSN0050L.TOKELIBO,
+          PARA-(?SYORINM1,?SYORINM2,?SYORINM3,?SYORIKN1,?SYORIKN2,
+                ?SYORIKN3,?SYORIKN4,?SYORIKN5)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+ABEND:
+
+    ?KEKA1 :=  'ジョイフル本田　ＰＣ請求送信データ作成が'
+    ?KEKA2 :=  '異常終了しました。ログリストを採取し，ナ'
+    ?KEKA3 :=  'ブへ連絡して下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+                /.１２３４５６７８９０１２３４５６７８９０１２３４./
+    ?SYORINM2 := '送信用請求データ作成が異常終了しました。　　　　'
+    ?SYORINM3 := 'ログを採取して、ＮＡＶへ連絡して下さい。　　　　　'
+    OVRPRTF FILE-PRTF,TOFILE-PRTFILE.TOKELIBO,
+            MEDLIB-TOKELIBO
+    CALL SSN0050L.TOKELIBO,
+          PARA-(?SYORINM1,?SYORINM2,?SYORINM3,?SYORIKN1,?SYORIKN2,
+                ?SYORIKN3,?SYORIKN4,?SYORIKN5)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

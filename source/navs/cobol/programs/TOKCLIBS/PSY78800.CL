@@ -1,0 +1,129 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    ロイヤルＨＣ　物品受領書発行         *  ./
+/. *   JOB-ID      :    PSY78800                             *  ./
+/. *   JOB-NAME    :    ロイヤルＨＣ　物品受領書発行         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PSY78800'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR ?KEKA4    ,STRING*40                    /.      5    ./
+    VAR ?OPR1     ,STRING*50                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?OPR2     ,STRING*50                    /.      2    ./
+    VAR ?OPR3     ,STRING*50                    /.      3    ./
+    VAR ?OPR4     ,STRING*50                    /.      4    ./
+    VAR ?OPR5     ,STRING*50                    /.      5    ./
+    VAR ?P1       ,STRING*8,VALUE-'00000000'    /.取引先CD./
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB/TOKELIBO
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  'ロイヤルＨＣ　物品受領書発行'
+
+    CLRFILE DCMJYRF.TOKKLIB
+
+/.##確認画面##./
+STEP010:
+
+    ?OPR1  :=  '【ロイヤルＨＣ　受領取込／受領書発行】'
+    ?OPR2  :=  '受信した受領データを取込／変換を行ないます。'
+    ?OPR3  :=  'その後、物品受領書を発行します。'
+    ?OPR4  :=  '受信処理は完了しておりますか？'
+    ?OPR5  :=  ''
+    CALL      OHOM0900.XUCL,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+/.##データ変換##./
+SSY7880B:
+
+    ?STEP :=   'SSY7880B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-ROYALJYR,TOFILE-ROYALJYR.ONLBLIB
+    OVRF      FILE-DCMJYRL1,TOFILE-DCMJYRL1.TOKKLIB
+    CALL      PGM-SSY7880B.TOKELIBO
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【ロイヤルＨＣ　物品受領データ変換】'
+              GOTO ABEND
+    END
+
+/.##ロイヤルＨＣ　物品受領書発行##./
+SSY7881L:
+
+    ?STEP :=   'SSY7881L '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-DCMJYUL2,TOFILE-DCMJYRL2.TOKKLIB
+    CALL      PGM-SSY7881L.TOKELIBO
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【ロイヤルＨＣ　物品受領書発行】'
+              GOTO ABEND END
+
+/.##ロイヤルＨＣ　累積ＤＴ作成##./
+SSY7882B:
+
+    ?STEP :=   'SSY7882B '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-ROYALJYR,TOFILE-ROYALJYR.ONLBLIB
+    OVRF      FILE-ROYJYRL1,TOFILE-ROYJYRL1.TOKKLIB
+    CALL      PGM-SSY7882B.TOKELIBO
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【ロイヤルＨＣ　受領累積作成】'
+              GOTO ABEND END
+
+RTN:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  '発行したリストを確認して下さい。'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

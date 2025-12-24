@@ -1,0 +1,133 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　新基幹システム                        *  ./
+/. *   SYSTEM-NAME :    基幹　　　　　　　　　　　　         *  ./
+/. *   JOB-ID      :    PNI02000                             *  ./
+/. *   JOB-NAME    :    日次更新計上エラーデータCSV出力      *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PNI02000'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?SOKO     ,STRING*2
+    VAR       ?JISOKO   ,STRING*2
+    VAR       ?OUTKBN   ,STRING*1,VALUE-' '
+    VAR       ?DNIDATE  ,STRING*8,VALUE-'        '
+    VAR       ?WKSTN    ,STRING*8
+    VAR       ?NWKSTN   ,NAME
+    VAR       ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                    /.      5    ./
+    ?NWKSTN    :=       @ORGWS
+    ?WKSTN    :=        %STRING(?NWKSTN)
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  '日次更新計上エラーＣＳＶ出力'
+/.ﾗｲﾌﾞﾗﾘﾘｽﾄ登録./
+    DEFLIBL    TOKFLIB/TOKELIB/TOKELIBO/TOKSOLIB/TOKMDLIB/
+               TOKDTLIB
+/.倉庫ＣＤ取得./
+SKY1601B:
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WKSTN,?SOKO,?JISOKO)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【倉庫ＣＤ取得】'
+              GOTO ABEND END
+
+
+/.日次更新計上エラーデータCSV指示./
+TNI0200I:
+    ?STEP :=   'TNI0200I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    OVRF      FILE-DNIERRL1,TOFILE-DNIERRL1.TOKDTLIB
+    CALL      PGM-TNI0200I.TOKSOLIB,PARA-(?DNIDATE)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?MSGX :=  '**  日次更新日= ' && ?DNIDATE && '      **'
+    SNDMSG    ?MSGX,TO-XCTL
+    IF        ?PGMEC    ^=   0    THEN
+              IF  ?PGMEC     =   4010 THEN
+                  SNDMSG    '## 取 消 ##',TO-XCTL
+                  GOTO RTN
+              ELSE
+                  ?KEKA4 :=  '【エラーデータＣＳＶ指示】'
+                  GOTO ABEND
+              END
+    END
+
+/.オンライン伝票変換エラーデータCSV出力./
+TNI0210V:
+    ?STEP :=   'TNI0210V'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-DNIERRL1,TOFILE-DNIERRL1.TOKDTLIB
+    OVRF      FILE-DNIERRCV,TOFILE-DNIERRCV.TOKDTLIB
+    CALL      PGM-TNI0210V.TOKSOLIB,PARA-(?DNIDATE)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【エラーデータＣＳＶ出力】'
+              GOTO ABEND END
+
+/.##データＰＣ転送##./
+PFIMPORT:
+
+    ?STEP :=   'PFIMPORT'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    FIMPORT FILE-DNIERRCV.TOKDTLIB,PARA-DNIERR,UNIT-1
+    ?PGMEC    :=   @PGMEC
+    ?PGMEM    :=   @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【エラーデータＣＳＶ転送】'
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+ABEND:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリストを採取後、ＮＡＶへ連絡'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+  /.?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM   ./
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

@@ -1,0 +1,157 @@
+/. ***TEST****************************************************  ./
+/. *     サカタのタネ　本社システム　　　　　　　　          *  ./
+/. *   SYSTEM-NAME :    ＨＧ基幹システム　　　　　　　　　   *  ./
+/. *   JOB-ID      :    PBT01200                             *  ./
+/. *   JOB-NAME    :    手書未連携データリスト発行　　　　　 *  ./
+/. *                                                      　 *  ./
+/. *   UPDATE      :                                         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS      ,STRING*08,VALUE-'        '      /.ﾜｰｸｽﾃｰｼｮﾝ文字  ./
+    VAR ?BUMON   ,STRING*04,VALUE-'    '          /.部門名       ./
+    VAR ?TANCD6  ,STRING*06,VALUE-'      '        /.担当者CDWK   ./
+    VAR ?TANCD   ,STRING*02,VALUE-'  '            /.担当者CD     ./
+    VAR ?SOUKO   ,STRING*02,VALUE-'  '            /.倉庫コード     ./
+    VAR ?DSOUKO  ,STRING*02,VALUE-'  '            /.代表倉庫コード ./
+    VAR ?WKSTN   ,NAME                            /.ﾜｰｸｽﾃｰｼｮﾝ名前  ./
+    VAR ?PGMEC   ,INTEGER                         /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ ./
+    VAR ?PGMECX  ,STRING*11                       /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ    ./
+    VAR ?PGMEM   ,STRING*99                       /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ  ./
+    VAR ?MSG     ,STRING*99(6)                    /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX    ,STRING*99                         /.SNDMSG表示用 ./
+    VAR ?CLID    ,STRING*08,VALUE-'PBT01200'        /.CLID         ./
+    VAR ?STEP    ,STRING*08                         /.STEP-ID      ./
+    VAR ?CLNM    ,STRING*40                         /.CL名称       ./
+    VAR ?KEKA1   ,STRING*40                         /.ﾒｯｾｰｼﾞ1      ./
+    VAR ?KEKA2   ,STRING*40                         /.ﾒｯｾｰｼﾞ2      ./
+    VAR ?KEKA3   ,STRING*40                         /.ﾒｯｾｰｼﾞ3      ./
+    VAR ?KEKA4   ,STRING*40                         /.ﾒｯｾｰｼﾞ4      ./
+    VAR ?OPR1    ,STRING*50                         /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?OPR2    ,STRING*50                         /.      2    ./
+    VAR ?OPR3    ,STRING*50                         /.      3    ./
+    VAR ?OPR4    ,STRING*50                         /.      4    ./
+    VAR ?OPR5    ,STRING*50                         /.      5    ./
+
+/.##実行PG名称ｾｯﾄ##./
+    ?CLNM := '手書未連携データ抽出　　　　　'
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB/TOKKLIB
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?CLID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##倉庫コード取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,
+                  PARA-(?WS,?SOUKO,?DSOUKO)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '倉庫コード取得'
+              GOTO ABEND
+    END
+
+/.##倉庫ｺｰﾄﾞ選択##./
+SKY1702I:
+
+    ?STEP :=   'SKY1702I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRDSPF   FILE-PRTF,TOFILE-PRTF.XUCL,MEDLIB-TOKELIB
+    CALL      PGM-SKY1702I.TOKELIB,PARA-(?SOUKO,?DSOUKO)
+    IF        @PGMEC    ^=   0    THEN
+              ?PGMEC := @PGMEC
+              IF    ?PGMEC  =  4010
+                 THEN
+                    ?MSGX := '##取消終了##'
+                    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+                    RETURN PGMEC-@PGMEC
+                 ELSE
+                    GOTO   ABEND
+                 END
+    END
+
+/.##手書未連携データ抽出##./
+SBT0120B:
+
+    ?STEP :=   'SBT0120B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-SHTDENLN,TOFILE-SHTDENLO.TOKKLIB
+    OVRF      FILE-SBTLSTF,TOFILE-SBTLSTF.TOKKLIB
+    CALL      PGM-SBT0120B.TOKELIBO
+             ,PARA-(?SOUKO)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '手書未連携データ抽出'
+              GOTO ABEND
+    END
+
+/.##手書未連携データリスト発行##./
+SBT0130L:
+
+    ?STEP :=   'SBT0130L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-PRTF,TOFILE-PRTF.TOKELIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-SBTLSTL1,TOFILE-SBTLSTL1.TOKKLIB
+    CALL      PGM-SBT0130L.TOKELIBO
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '手書未連携データリスト出力'
+              GOTO ABEND
+    END
+
+
+/.##正常終了処理##./
+RTN:
+
+    RELEASE   SBTLSTF.TOKKLIB!@XCL
+
+    ?MSGX :=  '***   '  && ?CLID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+/.------------------------------------------------------------------./
+
+/.##異常終了処理##./
+ABEND:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリストを採取後、ＮＡＶへ連絡'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?CLNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?CLID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

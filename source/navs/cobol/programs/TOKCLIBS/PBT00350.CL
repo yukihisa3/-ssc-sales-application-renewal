@@ -1,0 +1,93 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    変換伝票データ作成＋ＴＣ発注データ   *  ./
+/. *   JOB-ID      :    PBT00350                             *  ./
+/. *   JOB-NAME    :    ジュンテンドー　　　                 *  ./
+/. ***********************************************************  ./
+    PGM (P1-?HIDUKE,P2-?JIKAN,P3-?TOKCD)
+/.##ﾊﾟﾗﾒﾀ定義##./
+    PARA      ?HIDUKE   ,STRING*8,IN,VALUE-'        '
+    PARA      ?JIKAN    ,STRING*4,IN,VALUE-'    '
+    PARA      ?TOKCD    ,STRING*8,IN,VALUE-'        '
+    VAR       ?LINE     ,STRING*1,VALUE-' '
+    VAR       ?YUSEN    ,STRING*1,VALUE-' '
+    VAR       ?LIBNM    ,STRING*8,VALUE-'        '
+    VAR       ?FILNM    ,STRING*8,VALUE-'        '
+    VAR       ?JKEKA    ,STRING*4,VALUE-'    '
+/.##ﾜｰｸﾃｲｷﾞ##./
+    VAR       ?PGMEC    ,INTEGER                    /.ﾘﾀｰﾝｺｰﾄﾞ./
+    VAR       ?PGMECX   ,STRING*11                  /.ﾘﾀｰﾝｺｰﾄﾞ変換./
+    VAR       ?PGMEM    ,STRING*99                  /.ﾘﾀｰﾝ名称./
+    VAR       ?MSG      ,STRING*99(6)               /.ﾒｯｾｰｼﾞ退避ﾜｰｸ./
+    VAR       ?MSGX     ,STRING*99                  /.ﾒｯｾｰｼﾞ表示用./
+    VAR       ?PGMID    ,STRING*8,VALUE-'PBT00350'  /.PROGRAM-ID./
+    VAR       ?STEP     ,STRING*8                   /.STEP-ID./
+/.##ﾃﾞｰﾀ変換PG用ﾊﾟﾗﾒﾀ##./
+    VAR       ?PARA     ,STRING*14,VALUE-'              '
+/.##TC納品用ﾊﾟﾗﾒﾀ##./
+    VAR       ?PARA1    ,STRING*15,VALUE-'               '
+    VAR       ?CHK      ,STRING*1,VALUE-' '
+/.##結果FLG用##./
+    VAR       ?KEKA     ,STRING*4,VALUE-'    '      /.結果FLGﾊﾟﾗﾒﾀ./
+/.##ﾌｧｲﾙ変換ﾜｰｸ##./
+    VAR       ?LIBN     ,NAME                       /.ﾗｲﾌﾞﾗﾘ名前型./
+    VAR       ?FILN     ,NAME                       /.ﾌｧｲﾙ名前型./
+    VAR       ?FILLIB   ,NAME!MOD                   /.ﾌｧｲﾙ拡張用./
+    VAR       ?FILID    ,STRING*17                  /.ﾌｧｲﾙ名表示用./
+    VAR       ?PGNM     ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                  /.      5    ./
+
+/.##ﾌﾟﾛｸﾞﾗﾑｶｲｼﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+        /.##物流連携用データ作成##./
+        ?MSGX :=  '## 物流連携用CHK用DT削除 ##'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+        CLRFILE FILE-JTCHKYF.TOKKLIB
+        IF   @PGMEC ^= 0 THEN
+              GOTO      ABEND
+        END
+        ?MSGX :=  '## 物流連携用DT作成 ##'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+        OVRF    FILE-JTCHEDL1,TOFILE-JTCHEDL1.OSKFLIB
+        OVRF    FILE-JTCMEIL1,TOFILE-JTCMEIL1.OSKFLIB
+        OVRF    FILE-JTCMEOL1,TOFILE-JTCMEOL1.OSKFLIB
+        OVRF    FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+        OVRF    FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+        OVRF    FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+        OVRF    FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+        OVRF    FILE-JTCDENL1,TOFILE-JTCDENL1.TOKKLIB
+        OVRF    FILE-JTCHKYL1,TOFILE-JTCHKYL1.TOKKLIB
+        CALL    PGM-SBT0035B.TOKELIBO,PARA-(?HIDUKE,?JIKAN,?TOKCD)
+        IF   @PGMEC ^= 0 THEN
+              GOTO      ABEND
+        END
+
+/.##ﾌﾟﾛｸﾞﾗﾑ正常終了##./
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    RETURN    PGMEC-@PGMEC
+
+/.##異常終了時##./
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    END
+
+    RETURN    PGMEC-@PGMEC
+

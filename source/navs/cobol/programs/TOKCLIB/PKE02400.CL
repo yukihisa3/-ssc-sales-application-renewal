@@ -1,0 +1,64 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　出荷検品システム（本社システム）      *  ./
+/. *   SYSTEM-NAME :    出荷検品システム　　　　　　　　　　 *  ./
+/. *   JOB-ID      :    PKE02400                             *  ./
+/. *   JOB-NAME    :    検品送信結果ファイル作成処理         *  ./
+/. ***********************************************************  ./
+    PGM
+
+    VAR   ?WS    ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR   ?WKSTN ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR   ?PGMEC ,INTEGER
+    VAR   ?PGMECX,STRING*11
+    VAR   ?PGMEM ,STRING*99
+    VAR   ?MSG   ,STRING*99(6)
+    VAR   ?MSGX  ,STRING*99
+    VAR   ?PGMID ,STRING*8,VALUE-'PKE02400'
+    VAR   ?STEP  ,STRING*8
+    VAR   ?P1    ,STRING*6,VALUE-'000000' /.インプットＦ./
+    VAR   ?P2    ,STRING*6,VALUE-'000000' /.アウトプットＦ./
+    VAR   ?P3    ,STRING*6,VALUE-'000000' /.エラーカウント./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##検品明細更新累積##./
+SKE0240B:
+
+    ?STEP :=   'SKE0240B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-SNDFINPF,TOFILE-SNDFINPF.TOKFLIB
+    OVRF      FILE-SNDFINF,TOFILE-SNDFINF.TOKFLIB
+    OVRF      FILE-RUISYUL1,TOFILE-RUISYUL1.TOKFLIB
+    OVRF      FILE-SHTDENF,TOFILE-SHTDENL1.TOKFLIB
+    CALL      PGM-SKE0240B.TOKELIB,PARA-(?P1,?P2,?P3)
+    IF        @PGMEC    ^=   0   THEN
+              GOTO ABEND
+    END
+
+
+RTN: /.##ﾌﾟﾛｸﾞﾗﾑ正常時、終了ﾒｯｾｰｼﾞ##./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:/.##ﾌﾟﾛｸﾞﾗﾑ異常終了時、終了ﾒｯｾｰｼﾞ##./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

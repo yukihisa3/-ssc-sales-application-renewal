@@ -1,0 +1,517 @@
+/. ***********************************************************  ./
+/. *   （株）サカタのタネ                                    *  ./
+/. *   SYSTEM-NAME :    ナフコ出荷支援システム　　　　       *  ./
+/. *   JOB-ID      :    PSY3840C                             *  ./
+/. *   JOB-NAME    :    本発ＥＸＣＥＬデータ取込処理　　     *  ./
+/. ***********************************************************  ./
+    PGM  (P1-?JIKKOU)
+/.##ﾊﾟﾗﾒﾀ情報##./
+    PARA      ?JIKKOU   ,STRING*1,IN,VALUE-' '     /.実行区分     ./
+                                         /.' ':チェック ./
+                                         /.'1':チェック＆更新 ./
+
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMES    ,STRING*5,VALUE-'     '
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSY3840C'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '     /.部門./
+    VAR       ?TANCD8   ,STRING*8,VALUE-'      '   /.部門+担当者./
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '       /.担当者./
+    VAR       ?KANRINO  ,STRING*8,VALUE-'00000000' /.管理番号    ./
+    VAR       ?JDATE    ,STRING*8,VALUE-'00000000' /.取込日付    ./
+    VAR       ?JTIME    ,STRING*6,VALUE-'000000'   /.取込時間    ./
+    VAR       ?JTOKCD   ,STRING*8,VALUE-'00000000' /.取込取引先  ./
+    VAR       ?SKBCD    ,STRING*2,VALUE-'00'       /.作場./
+    VAR       ?SOKCD    ,STRING*2,VALUE-'00'       /.実行倉庫    ./
+    VAR       ?DSOKCD   ,STRING*2,VALUE-'00'       /.代表倉庫    ./
+    VAR       ?ERRKBN   ,STRING*1,VALUE-'0'        /.エラー区分  ./
+    VAR       ?SSOKCD   ,STRING*2,VALUE-'  '       /.倉庫ＣＤ  ./
+    VAR       ?OPR1     ,STRING*50                 /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                 /.      2    ./
+    VAR       ?OPR3     ,STRING*50                 /.      3    ./
+    VAR       ?OPR4     ,STRING*50                 /.      4    ./
+    VAR       ?OPR5     ,STRING*50                 /.      5    ./
+/.-----------------------------------------------------------./
+    VAR       ?MSG1   ,STRING*80                  /.開始終了MSG./
+    VAR       ?PGNM   ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1  ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2  ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3  ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4  ,STRING*40                  /.      5    ./
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKELIBO/TOKDLIB/TOKFLIB/TOKKLIB
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    IF  ?JIKKOU  =  '1'  THEN
+        ?PGNM :=  '本発ＥＸＣＥＬＤＴ取込＆更新'
+    ELSE
+        ?PGNM :=  '本発ＥＸＣＥＬTＤＴ－チェック'
+    END
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+STEP000:
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?SOKCD,?DSOKCD)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0   THEN
+              ?KEKA4 := '倉庫コード取得'
+              GOTO ABEND
+    END
+
+/.##ログインユーザー情報取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD8)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              GOTO ABEND
+    END
+    ?TANCD := %SBSTR(?TANCD8,1,2)
+
+/.##排他制御ファイルロック##./
+ASSIGN:
+
+    ?STEP :=   'ASSIGN'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.  ASSIGN    FILE-NARLOCF.TOKKLIB!@XCL
+./  ASSIGN FILE-RCVHAKOS.TOKDLIB!@XCL/RCVSUKAK.TOKDLIB!@XCL/
+           NFTENMS.TOKDLIB!@XCL/TRKAKUF.TOKDLIB!@XCL/
+           TRHAKOF.TOKDLIB!@XCL
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '排他制御ファイルロック'
+              GOTO ABEND1
+    END
+
+/.##取込確認画面##./
+SHOM0900:
+
+    ?STEP :=   'SHOM0900'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    IF  ?JIKKOU = '1'  THEN
+      ?OPR1  :=  '＜本発ＥＸＣＥＬデータ取込処理（更新）＞'
+      ?OPR2  :=  '　ＥＸＣＥＬにて作成された本発データの取込＆'
+      ?OPR3  :=  '　更新を行います。売上計上まで実施されるため'
+      ?OPR4  :=  '　注意願います。チェック処理はエラーなく終了'
+      ?OPR5  :=  '　しておりますか？確認して下さい！！'
+    ELSE
+      ?OPR1  :=  '＜本発ＥＸＣＥＬデータ取込処理（チェック）＞'
+      ?OPR2  :=  '　ＥＸＣＥＬにて作成された本発データの取込を'
+      ?OPR3  :=  '　行ないます。ＥＸＣＥＬより出力したファイル'
+      ?OPR4  :=  '　は出力済ですか？'
+      ?OPR5  :=  '　また、所定フォルダにセット済ですか？'
+    END
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '処理確認画面'
+              GOTO ABEND END
+
+/.##ＥＸＣＥＬデータ取込処理##./
+PFEXPORT:
+
+    ?STEP :=   'PFEXPORT'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    FEXPORT FILE-RCVSUKAK.TOKDLIB,MODE-@REP,PARA-AMNAFUKO,UNIT-3
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := 'ＥＸＣＥＬ（明細Ｄ）取込異常！！'
+              GOTO ABEND END
+
+    FEXPORT FILE-RCVHAKOS.TOKDLIB,MODE-@REP,PARA-AMNAFUKO,UNIT-4
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := 'ＥＸＣＥＬ（箱数Ｄ）取込異常！！'
+              GOTO ABEND END
+
+/.##取込数量確定／箱数確定　初期化##./
+PCLRFILE:
+
+    ?STEP :=   'PCLRFILE'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CLRFILE FILE-TRKAKUF.TOKDLIB
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '取込数量確定Ｆ　初期化！！'
+              GOTO ABEND END
+
+    CLRFILE FILE-TRHAKOF.TOKDLIB
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '取込箱数確定Ｆ　初期化！！'
+              GOTO ABEND END
+
+/.##本発振分処理（エラーチェック）##./
+SSY3840C:
+
+    ?STEP :=   'SSY3840C'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CALL      PGM-SSY3840C.TOKSOLIB,PARA-(?BUMON,?TANCD,?JDATE,
+                                  ?JTIME,?JTOKCD,?SKBCD,?ERRKBN)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発振分処理（エラーチェック）'
+              GOTO ABEND END
+/.##出力パラメタ確認##./
+    ?MSGX :=  '## ｴﾗｰ区分 = ' && ?ERRKBN && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    ?MSGX :=  '## 作場CD  = ' && ?SKBCD  && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    ?MSGX :=  '## 取引CD  = ' && ?JTOKCD  && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+/.##実行区分／エラー区分判定##./
+PHANTEI:
+
+    ?STEP :=   'PHANTEI '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    IF  ?JIKKOU  =  ' '  THEN   /.##実行区分がチェックのみの場合##./
+        ?MSGX :=  '##################################'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '#　チェックのみを行ないます。　　#'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '#　チェックＯＫの場合は、更新処　#'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '#　理を開始して下さい。　　　　　#'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '##################################'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+         GOTO  SSY3846L
+    END
+    IF  ?ERRKBN  =  '1'  THEN   /.##エラーがあった場合##./
+        ?MSGX :=  '##################################'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '#　エラーチェックにおいてエラー　#'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '#　箇所があります。エラーリスト　#'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '#　を確認し修正／再取込をお願い　#'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '#　します。　　　　　　　　　　　#'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+        ?MSGX :=  '##################################'
+        SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+         GOTO  SSY3846L
+    END
+
+/.##本発管理番号採番##./
+SSY3841B:
+
+    ?STEP :=   'SSY3841B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+/.##パラメタ確認 TEST ##
+    ?MSGX :=  '## ?JDATE  = ' && ?JDATE  && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    ?MSGX :=  '## ?JTIME  = ' && ?JTIME  && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    ?MSGX :=  '## ?JTOKCD = ' && ?JTOKCD && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    ?MSGX :=  '## ?SKBCD  = ' && ?SKBCD  && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    ?MSGX :=  '## ?TANCD  = ' && ?TANCD  && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    ?MSGX :=  '## ?BUMON  = ' && ?BUMON  && ' ##'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    ?MSGX :=  '## ?KANRINO= ' && ?KANRINO && ' ##'
+  ##パラメタ確認 TEST ##./
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SSY3841B.TOKELIBO,PARA-(?JDATE,?JTIME,?JTOKCD,
+                                          ?SKBCD,
+                                          ?TANCD,?BUMON,?KANRINO)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発管理番号採番'
+              GOTO ABEND END
+
+/.##本発分更新基本データ作成##./
+SSY3842B:
+
+    ?STEP :=   'SSY3842B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CALL      PGM-SSY3842B.TOKELIBO,PARA-(?JDATE,?JTIME,?TANCD,
+                                          ?BUMON)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発分更新基本データ作成'
+              GOTO ABEND END
+
+/.##本発売上伝票ファイル作成##./
+SSY3843B:
+
+    ?STEP :=   'SSY3843B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CALL      PGM-SSY3843B.TOKELIBO,PARA-(?WKSTN,?BUMON,?TANCD)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発売上伝票ファイル作成'
+              GOTO ABEND END
+
+/.##本発基本情報ファイル作成##./
+SSY3844B:
+
+    ?STEP :=   'SSY3844B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CALL      PGM-SSY3844B.TOKELIBO,PARA-(?BUMON,?TANCD)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発基本情報ファイル作成'
+              GOTO ABEND END
+
+/.##本発数量／箱数ファイル作成##./
+SSY3845B:
+
+    ?STEP :=   'SSY3845B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CALL      PGM-SSY3845B.TOKELIBO,PARA-(?JDATE,?JTIME)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発数量／箱数ファイル作成'
+              GOTO ABEND END
+
+/.##本発取込管理リスト発行##./
+SSY3846L:
+
+    ?STEP :=   'SSY3846L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+/.##OVRPRTF FILE-XU04LP,TOFILE-LBPPRTE1.TOKELIBO,MEDLIB-TOKELIBO##./
+    IF  ?SOKCD  =  '01'  THEN
+        ?MSGX :=  '出力先 = 本社'
+        SNDMSG  ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+        OVRPRTF FILE-XU04LP,TOFILE-LBPPRT01.TOKELIBO,MEDLIB-TOKELIBO
+    ELSE
+        ?MSGX :=  '出力先 = 九州'
+        SNDMSG  ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+        OVRPRTF FILE-XU04LP,TOFILE-LBPPRTE1.TOKELIBO,MEDLIB-TOKELIBO
+    END
+    CALL      PGM-SSY3846L.TOKELIBO,PARA-(?JDATE,?JTIME,
+                                          ?JDATE,?JTIME)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発取込管理リスト発行'
+              GOTO ABEND END
+
+/.##本発ＥＸＣＥＬ確定データ取込結果リスト発行##./
+SSY3847L:
+
+    ?STEP :=   'SSY3847L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+/.##OVRPRTF FILE-XU04LP,TOFILE-LBPPRTE1.TOKELIBO,MEDLIB-TOKELIBO##./
+    IF  ?SOKCD  =  '01'  THEN
+        ?MSGX :=  '出力先 = 本社'
+        SNDMSG  ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+        OVRPRTF FILE-XU04LP,TOFILE-LBPPRT01.TOKELIBO,MEDLIB-TOKELIBO
+    ELSE
+        ?MSGX :=  '出力先 = 九州'
+        SNDMSG  ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+        OVRPRTF FILE-XU04LP,TOFILE-LBPPRTE1.TOKELIBO,MEDLIB-TOKELIBO
+    END
+    CALL      PGM-SSY3847L.TOKELIBO,PARA-(?JDATE,?JTIME,?JDATE,
+                                          ?JTIME,?BUMON,?TANCD)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発ＥＸＣＥＬ確定データ取込結果リスト発行'
+              GOTO ABEND END
+
+    IF  ?JIKKOU ^= '1'  THEN
+         GOTO   RTN
+    END
+
+/.##本発原売価チェックデータ初期化##./
+PCLRFIL2:
+
+    ?STEP :=   'PCLRFIL2'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CLRFILE NFGBCKF.TOKDLIB
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発原売価チェックデータ初期化'
+              GOTO ABEND END
+
+/.##本発原売価チェックデータ作成##./
+SSY3848B:
+
+    ?STEP :=   'SSY3848B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CALL      PGM-SSY3848B.TOKELIBO,PARA-(?KANRINO,?SSOKCD)
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発原売価チェックデータ作成'
+              GOTO ABEND END
+
+/.##本発原売価チェックリスト発行##./
+NFHONLST:
+
+    ?STEP :=   'NFHONLST'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    IF  ?SOKCD  =  '01'  THEN
+        CHGCMVAR '@OUTQN',XOUTQ1
+    ELSE
+        CHGCMVAR '@OUTQN',XOUTQ1
+    END
+    STRDPSD OBJ-NFHONLST.TOKDLIB
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := '本発原売価チェックリスト発行'
+              GOTO ABEND END
+
+RTN:
+
+
+    RELEASE FILE-RCVHAKOS.TOKDLIB!@XCL/RCVSUKAK.TOKDLIB!
+            @XCL/NFTENMS.TOKDLIB!@XCL/TRKAKUF.TOKDLIB!@XCL/
+            TRHAKOF.TOKDLIB!@XCL
+
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    IF  ?ERRKBN  =  '1'  THEN
+        ?KEKA1 :=  'エラーチェックにおいてエラー'
+        ?KEKA2 :=  '箇所があります。エラーリスト'
+        ?KEKA3 :=  'を確認し修正／再取込をお願い'
+        ?KEKA4 :=  'します。'
+    ELSE
+        ?KEKA1 :=  '本発ＥＸＣＥＬデータ取込処理が正常'
+        ?KEKA2 :=  '終了しました。'
+        ?KEKA3 :=  ''
+        ?KEKA4 :=  ''
+    END
+    CALL SMG0030I.TOKELIB
+           ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    RELEASE FILE-RCVHAKOS.TOKDLIB!@XCL/RCVSUKAK.TOKDLIB!
+            @XCL/NFTENMS.TOKDLIB!@XCL/TRKAKUF.TOKDLIB!@XCL/
+            TRHAKOF.TOKDLIB!@XCL
+
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    ?KEKA1 :=  '本発ＥＸＣＥＬデータ取込処理が異常'
+    ?KEKA2 :=  '終了しました。'
+    ?KEKA3 :=  'ログ採取し，ＮＡＶへ連絡して下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    END
+
+    RETURN    PGMEC-?PGMEC
+
+ABEND1:
+
+    RELEASE FILE-RCVHAKOS.TOKDLIB!@XCL/RCVSUKAK.TOKDLIB!
+            @XCL/NFTENMS.TOKDLIB!@XCL/TRKAKUF.TOKDLIB!@XCL/
+            TRHAKOF.TOKDLIB!@XCL
+
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    ?KEKA1 :=  '本発ＥＸＣＥＬデータ取込処理関係ファイ'
+    ?KEKA2 :=  'ルが他端末で使用されております。'
+    ?KEKA3 :=  '他端末で使用中でないか確認して下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    END
+
+    RETURN    PGMEC-?PGMEC
+

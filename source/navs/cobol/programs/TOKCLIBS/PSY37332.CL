@@ -1,0 +1,324 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    ナフコ新ＥＤＩ                       *  ./
+/. *   JOB-ID      :    PSY37330                             *  ./
+/. *   JOB-NAME    :    取込データ振分処理―ストックフォーム *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSY37330'
+    VAR       ?STEP     ,STRING*8
+/.##ﾌｧｲﾙ名称編集用##./
+    VAR       ?WKSTN    ,NAME
+    VAR       ?WS       ,STRING*8,VALUE-'        '
+    VAR       ?R        ,STRING*1,VALUE-'R'
+    VAR       ?W        ,STRING*1,VALUE-'W'
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '
+    VAR       ?TANBUM   ,STRING*6
+    VAR       ?INDATE   ,STRING*8,VALUE-'00000000'
+    VAR       ?INTIME   ,STRING*6,VALUE-'000000'
+    VAR       ?PGNM     ,STRING*40                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                    /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                    /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                    /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                    /.      5    ./
+    VAR       ?OPR1     ,STRING*50                    /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                    /.      2    ./
+    VAR       ?OPR3     ,STRING*50                    /.      3    ./
+    VAR       ?OPR4     ,STRING*50                    /.      4    ./
+    VAR       ?OPR5     ,STRING*50                    /.      5    ./
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  'テクノス出荷確定データ取込'
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKFLIB/TOKELIB/TOKKLIB/TOKWLIB/TOKELIBO
+
+KAKUNIN:
+
+    ?OPR1  :=  '【テクノス確定ＤＴ取込（事前ＣＨＫ）】'
+    ?OPR2  :=  ''
+    ?OPR3  :=  'テクノス様からの確定データの事前取込ＣＨＫ'
+    ?OPR4  :=  'を行ないます。更新処理等は行ないませんので'
+    ?OPR5  :=  '注意願います。！！'
+    CALL      OHOM0900.XUCL,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+/.##部門ｺｰﾄﾞ取得##./
+SKY1602B:
+
+    ?STEP :=   'SKY1602B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1602B.TOKELIBO,PARA-(?WS,?BUMON)
+    IF        @PGMEC    ^=   0
+          THEN
+              ?KEKA4 :=  '【部門取得】'
+              GOTO ABEND
+    END
+
+/.##担当者CD指定##./
+SKY6101I:
+
+    ?STEP :=   'SKY6101I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-SKY6101I.TOKELIBO,PARA-(?BUMON,?TANCD)
+    IF        @PGMEC    ^=   0  THEN
+              IF  @PGMEC = 4010  THEN
+                  SNDMSG MSG-'##取消終了##',TO-XCTL
+                  RETURN
+              ELSE
+                  ?KEKA4 :=  '【担当者ＣＤ指定】'
+                  GOTO  ABEND
+              END
+    END
+
+/.##テクノスデータを取込##./
+/.##数量確定データ##./
+PFEXPOR1:
+
+    ?STEP :=   'PFEXPOR1'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    FEXPORT FILE-RCVSUKAK.TOKWLIB,MODE-@REP,PARA-TECNOS,
+            UNIT-1
+    IF        @PGMEC    ^=   0  THEN
+              ?KEKA4 :=  '【数量確定データ取込】'
+              GOTO  ABEND
+    END
+
+/.##箱数確定データ##./
+PFEXPOR2:
+
+    ?STEP :=   'PFEXPOR2'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    FEXPORT FILE-RCVHAKOS.TOKWLIB,MODE-@REP,PARA-TECNOS,
+            UNIT-2
+    IF        @PGMEC    ^=   0  THEN
+              ?KEKA4 :=  '【箱数確定データ取込】'
+              GOTO  ABEND
+    END
+
+/.##振分処理##./
+SSY3733B:
+
+    ?STEP :=   'SSY3733B '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF      FILE-NFMEIMS1,TOFILE-NFSHOMS1.TOKKLIB
+    OVRF      FILE-RCVSUKAK,TOFILE-RCVSUKAK.TOKWLIB
+    OVRF      FILE-RCVHAKOS,TOFILE-RCVHAKOS.TOKWLIB
+    OVRF      FILE-SHTDENLA,TOFILE-SHTDENLA.TOKFLIB
+    OVRF      FILE-SHTDENL1,TOFILE-SHTDENL1.TOKFLIB
+    CALL      PGM-SSY3733B.TOKELIBO,
+              PARA-(?BUMON,?TANCD,?INDATE,?INTIME)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【取込データチェック／振分処理】'
+              GOTO ABEND END
+
+/.##オンラインデータ分数量箱数確定データ更新##./
+SSY3735B:
+
+    ?STEP :=   'SSY3735B '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF      FILE-NFMEIMS1,TOFILE-NFSHOMS1.TOKKLIB
+    OVRF      FILE-ZAMZAIL1,TOFILE-ZAMZAIL1.TOKFLIB
+    OVRF      FILE-NFJOHOL1,TOFILE-NFJOHOL1.TOKKLIB
+    OVRF      FILE-SHTDENLA,TOFILE-SHTDENLA.TOKFLIB
+    OVRF      FILE-TRKAKUL2,TOFILE-TRKAKUL2.TOKKLIB
+    OVRF      FILE-TRHAKOL2,TOFILE-TRHAKOL2.TOKKLIB
+    OVRF      FILE-NFSUTEL4,TOFILE-NFSUTEL4.TOKKLIB
+    OVRF      FILE-NFHAKOL4,TOFILE-NFHAKOL4.TOKKLIB
+/.  CALL      PGM-SSY3735B.TOKELIBO,
+              PARA-(?INDATE,?INTIME)
+./  IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【ＯＮＬ分数量箱数確定データ更新】'
+              GOTO ABEND END
+
+/.##手書分更新基本データ作成##./
+SSY3737B:
+
+    ?STEP :=   'SSY3737B '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-TRKAKUL2,TOFILE-TRKAKUL2.TOKKLIB
+    OVRF      FILE-NFSHOMS1,TOFILE-NFSHOMS1.TOKKLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF      FILE-SHTDENWK,TOFILE-NFDENWK.TOKWLIB
+/.  CALL      PGM-SSY3737B.TOKELIBO,
+              PARA-(?INDATE,?INTIME,?TANCD,?BUMON)
+./  IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【手書分更新基本データ作成】'
+              GOTO ABEND END
+
+/.##手書伝票データ作成##./
+SSY3739B:
+
+    ?STEP :=   'SSY3739B '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-NFDENWK,TOFILE-NFDENWK.TOKWLIB
+    OVRF      FILE-SHTDENL1,TOFILE-SHTDENL1.TOKFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZAMZAIL1,TOFILE-ZAMZAIL1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-NFSHOMS1,TOFILE-NFSHOMS1.TOKKLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+/.  CALL      PGM-SSY3739B.TOKELIBO,
+              PARA-(?WS,?BUMON,?TANCD)
+./  IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【手書分更新基本データ作成】'
+              GOTO ABEND END
+
+/.##手書基本情報Ｆ作成##./
+SSY3741B:
+
+    ?STEP :=   'SSY3741B '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-NFDENWK,TOFILE-NFDENWK.TOKWLIB
+    OVRF      FILE-NFJOHOL1,TOFILE-NFJOHOL1.TOKKLIB
+    OVRF      FILE-SAKUBAL1,TOFILE-SAKUBAL1.TOKKLIB
+/.  CALL      PGM-SSY3741B.TOKELIBO,
+              PARA-(?BUMON,?TANCD)
+./  IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【手書基本情報Ｆ作成】'
+              GOTO ABEND END
+
+/.##数量／箱数確定Ｆ作成##./
+SSY3740B:
+
+    ?STEP :=   'SSY3740B '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-TRKAKUL2,TOFILE-TRKAKUL2.TOKKLIB
+    OVRF      FILE-TAHAKOL2,TOFILE-TRHAKOL2.TOKKLIB
+    OVRF      FILE-NFSUTEL4,TOFILE-NFSUTEL4.TOKKLIB
+    OVRF      FILE-NFHAKOL4,TOFILE-NFHAKOL4.TOKKLIB
+/.  CALL      PGM-SSY3740B.TOKELIBO,
+              PARA-(?INDATE,?INTIME)
+./  IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【数量／箱数確定Ｆ作成】'
+              GOTO ABEND END
+
+/.##テクノス取込管理リスト##./
+SSY3743L:
+
+    ?STEP :=   'SSY3743L '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.  OVRPRTF   FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+./  OVRF      FILE-TECKANL1,TOFILE-TECKANL1.TOKKLIB
+    OVRF      FILE-SAKUBAL1,TOFILE-SAKUBAL1.TOKKLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-SSY3743L.TOKELIBO,
+              PARA-(?INDATE,?INTIME,?INDATE,?INTIME)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【取込エラーリスト発行】'
+              GOTO ABEND END
+
+/.##取込エラーリスト発行##./
+SSY3742L:
+
+    ?STEP :=   'SSY3742L '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.  OVRPRTF   FILE-XU04LP,TOFILE-KAHMAPRT.XUCL
+./  OVRF      FILE-TRKAKUL1,TOFILE-TRKAKUL1.TOKKLIB
+    OVRF      FILE-TAHAKOL3,TOFILE-TRHAKOL3.TOKKLIB
+    CALL      PGM-SSY3742L.TOKELIBO,
+              PARA-(?INDATE,?INTIME,?INDATE,?INTIME)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【取込エラーリスト発行】'
+              GOTO ABEND END
+
+RTN:
+
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '取込処理が正常終了しました。'
+    ?KEKA2 :=  'エラーリストが発行された場合は確認を'
+    ?KEKA3 :=  '行なって下さい。'
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX    :=  '## 取込日次 = ' && ?INDATE  &&
+                 ' 取込時間 = ' && ?INTIME
+    SNDMSG MSG-?MSGX,TO-XCTL
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '取込処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取し，ＮＡＶへ連絡して'
+    ?KEKA3 :=  '下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

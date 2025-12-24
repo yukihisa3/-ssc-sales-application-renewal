@@ -1,0 +1,84 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    受配信サブシステム        　　　     *  ./
+/. *   JOB-ID      :    PCV00120                             *  ./
+/. *   JOB-NAME    :    管理ファイルワーク作成   　　　　　  *  ./
+/. *               :                                         *  ./
+/. ***********************************************************  ./
+/.###ﾜｰｸｴﾘｱ定義####./
+    PGM (P1-?LINE,P2-?YUSEN)
+/.##ﾊﾟﾗﾒﾀ##./
+    PARA ?LINE    ,STRING*1,IN,VALUE-' '        /.ｶｲｾﾝ./
+    PARA ?YUSEN   ,STRING*1,IN,VALUE-' '        /.ﾕｳｾﾝｼﾞｭﾝｲ./
+/.##ﾜｰｸ##./
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PCV00120'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+/.###ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##管理ファイルワーク作成##./
+SCV0012B:
+
+    ?STEP :=   %LAST(LABEL)
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    IF   ?LINE = 'I' & ?YUSEN = '1' THEN    /.ＩＳＤＮ＋優先_./
+         ?MSGX := '##  ＩＳＤＮ_  管理ＤＴ作成 ##'
+         SNDMSG MSG-?MSGX,TO-XCTL
+         OVRF FILE-KANRIWK,TOFILE-KANRIWK1.TOKFLIB
+    END
+    IF   ?LINE = 'T' & ?YUSEN = '1' THEN    /.ＴＥＬ　＋優先_./
+         ?MSGX := '##  ＴＥＬ_    管理ＤＴ作成 ##'
+         SNDMSG MSG-?MSGX,TO-XCTL
+         OVRF FILE-KANRIWK,TOFILE-KANRIWK2.TOKFLIB
+    END
+    OVRF      FILE-HTOKMS,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-JHMEOSF,TOFILE-JHMEOSL1.TOKFLIB
+    CALL      PGM-SCV0012B.TOKELIB,PARA-(?LINE)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+                                            /.ＩＳＤＮ＋優先_./
+ /. IF   ?LINE = 'I' & ?YUSEN = '1' THEN
+         SNDFILE COM-PCPATH01.PCNODE01,SFILE-KANRIWK1.TOKFLIB,
+                 DFILE-'KANRIWK1',RL-200,BF-5
+         SNDRSJJ COM-PCPATH01.PCNODE01,DFILE-'KANRIF1'
+    END ./
+                                            /.ＴＥＬ　＋優先_./
+ /. IF   ?LINE = "T" & ?YUSEN = '1' THEN
+         SNDFILE COM-PCPATH01.PCNODE01,SFILE-KANRIWK2.TOKFLIB,
+                 DFILE-'KANRIWK2',RL-200,BF-5
+         SNDRSJJ COM-PCPATH01.PCNODE01,DFILE-'KANRIF2'
+    END  ./
+
+/.###ﾌﾟﾛｸﾞﾗﾑ終了###./
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

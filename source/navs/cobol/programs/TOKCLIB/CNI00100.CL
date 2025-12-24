@@ -1,0 +1,540 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :                                         *  ./
+/. *   JOB-ID      :    CNI00100                             *  ./
+/. *   JOB-NAME    :    日次更新                             *  ./
+/. *               :    売上日次更新                         *  ./
+/. *               :    在庫日時更新を行う                   *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC  ,INTEGER
+    VAR       ?PGMECX ,STRING*11
+    VAR       ?PGMEM  ,STRING*99
+    VAR       ?MSG    ,STRING*99(6)
+    VAR       ?MSGX   ,STRING*99
+    VAR       ?PGMID  ,STRING*8,VALUE-'CNI00100'
+    VAR       ?STEP   ,STRING*8
+    VAR       ?WKSTN  ,STRING*8
+    VAR       ?JBNM   ,STRING*24!MIXED            /.業務漢字名 ./
+    VAR       ?JBID   ,STRING*10                  /.業務ＩＤ   ./
+    VAR       ?PGNM   ,STRING*24!MIXED            /.ＰＧ漢字名 ./
+    VAR       ?PGID   ,STRING*10                  /.ＰＧＩＤ　 ./
+    VAR       ?CHK    ,STRING*1,VALUE-'0'         /.ﾊﾟﾗﾒﾀﾁｪｯｸ./
+/.-----------------------------------------------------------./
+    VAR       ?CLID   ,STRING*8                   /.ＣＬＩＤ   ./
+    VAR       ?MSG1   ,STRING*80                  /.開始終了MSG./
+    VAR       ?OPR1   ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2   ,STRING*50                  /.      2    ./
+    VAR       ?OPR3   ,STRING*50                  /.      3    ./
+    VAR       ?OPR4   ,STRING*50                  /.      4    ./
+    VAR       ?OPR5   ,STRING*50                  /.      5    ./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.#################################################################./
+/.##資源の事前獲得（下記ファイル使用時、メッセージ表示）         ##./
+/.#################################################################./
+FILECHK:
+    ASSIGN FILE-SHTDENF.TOKFLIB!@XCL/   /.##売上ﾌｧｲﾙ##./
+                HSHOTBL.TOKFLIB!@XCL/   /.##商品変換TBL##./
+                HMEIMS.TOKFLIB!@XCL/    /.##商品名称ﾏｽﾀ##./
+                HTOKMS.TOKFLIB!@XCL/    /.##取引先ﾏｽﾀ##./
+                HTENMS.TOKFLIB!@XCL/    /.##店舗ﾏｽﾀ##./
+                NYKFILF.TOKFLIB!@XCL/   /.##入庫ﾌｧｲﾙ##./
+                HACHEDF.TOKFLIB!@XCL/   /.##発注ﾍｯﾀﾞﾌｧｲﾙ##./
+                HACMEIF.TOKFLIB!@XCL/   /.##発注明細ﾌｧｲﾙ##./
+                NYSFILF.TOKFLIB!@XCL/   /.##入出庫ﾌｧｲﾙ##./
+                SGYFILF.TOKFLIB!@XCL/   /.##作業実績ﾌｧｲﾙ##./
+                TOKU.TOKFLIB!@XCL/      /.##売上計上ﾌｧｲﾙ##./
+                TOKUZ.TOKFLIB!@XCL/     /.##仕入／作業計上ﾌｧｲﾙ##./
+                ZAMZAIF.TOKFLIB!@XCL/   /.##在庫ﾏｽﾀ##./
+                ZAMJISF.TOKFLIB!@XCL    /.##在庫ﾏｽﾀ実績##./
+    IF     @PGMEC  ^=    0    THEN    GOTO   ERR  END
+
+/.#################################################################./
+/.##実行端末チェック（コンソール以外はエラー）                   ##./
+/.#################################################################./
+TANMCHK:
+
+    ?WKSTN    :=      %STRING(@ORGWS)
+    SNDMSG ?WKSTN,TO-XCTL
+
+    IF     ?WKSTN     ^=    'WKSTN001'
+        THEN
+            SNDMSG '＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊',TO-XCTL
+            SNDMSG '＊　　　　　　　　　　　　　　　＊',TO-XCTL
+            SNDMSG '＊この端末からは処理できません　＊',TO-XCTL
+            SNDMSG '＊　　　　　　　　　　　　　　　＊',TO-XCTL
+            SNDMSG '＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊＊',TO-XCTL
+            GOTO   RTN   END
+
+/.#################################################################./
+/.##日次更新開始確認画面表示（ＭＯ，ＤＡＴセット）               ##./
+/.#################################################################./
+STEP1:
+
+    ?JBID    :=   'CNI00100'
+    ?CLID    :=   'CNI00100'
+    ?MSG1    := '<<< ' && ?CLID && ' START '
+               && %SBSTR(@SDATEY,1,2) && '/'
+               && %SBSTR(@SDATEY,3,2) && '/'
+               && %SBSTR(@SDATEY,5,2) && ' '
+               && %SBSTR(@STIME,1,2)  && ':'
+               && %SBSTR(@STIME,3,2)  && ':'
+               && %SBSTR(@STIME,5,2)  && ' >>>'
+     SNDMSG  MSG-?MSG1,TOWS-@ORGWS,JLOG-@YES
+
+    ?OPR1  :=  '　＃＃＃＃＃＃＃　日次更新処理　＃＃＃＃＃＃＃＃　'
+    ?OPR2  :=  '　　日次更新処理を開始します。確認して下さい。　　'
+    ?OPR3  :=  '　　１．データ退避用のＭＯをセットして下さい。　　'
+    ?OPR4  :=  '　　２．データ退避用ＤＡＴをセットして下さい。　　'
+    ?OPR5  :=  '　＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    DEFLIBL TOKELIB/TOKFLIB
+
+/.#################################################################./
+/.##日次更新条件入力画面表示                                     ##./
+/.#################################################################./
+STEP2:
+
+    ?STEP :=   'SNI0010I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    CALL      PGM-SNI0010I.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              IF    @PGMEC = 4010 THEN
+                    ?MSGX := '##取消終了##'
+                    SNDMSG MSG-?MSGX,TO-XCTL
+                    RETURN PGMEC-@PGMEC
+              ELSE
+                    GOTO ABEND
+              END
+    END
+
+/.#################################################################./
+/.##日次更新データバックアップ処理（ＭＯ，ＤＡＴ）               ##./
+/.#################################################################./
+STEP3:
+
+    ?STEP :=   'SAVFILE '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ?MSG1    := '<<< '
+               && %SBSTR(@SDATEY,1,2) && '/'
+               && %SBSTR(@SDATEY,3,2) && '/'
+               && %SBSTR(@SDATEY,5,2) && ' '
+               && %SBSTR(@STIME,1,2)  && ':'
+               && %SBSTR(@STIME,3,2)  && ':'
+               && %SBSTR(@STIME,5,2)  && ' >>>'
+     SNDMSG  MSG-?MSG1,TOWS-@ORGWS,JLOG-@YES
+/.     SNDMSG MSG-'売上ファイル　　退避中',TO-XCTL
+       SAVFILE FILE-SHTDENF.TOKFLIB,TODEV-MO,ADD-@NO,MODE-@USED
+       SNDMSG MSG-'売上中間データ　退避中',TO-XCTL
+       SAVFILE FILE-JHSHENF.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'商品変換テーブル退避中',TO-XCTL
+       SAVFILE FILE-HSHOTBL.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'商品名称マスタ　退避中',TO-XCTL
+       SAVFILE FILE-HMEIMS.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'取引先マスタ　　退避中',TO-XCTL
+       SAVFILE FILE-HTOKMS.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'店舗マスタ　　　退避中',TO-XCTL
+       SAVFILE FILE-HTENMS.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'条件ファイル　　退避中',TO-XCTL
+       SAVFILE FILE-HJYOKEN.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'入庫ファイル　　退避中',TO-XCTL
+       SAVFILE FILE-NYKFILF.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'発注ヘッダＦ　　退避中',TO-XCTL
+       SAVFILE FILE-HACHEDF.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'発注明細Ｆ　　　退避中',TO-XCTL
+       SAVFILE FILE-HACMEIF.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'入出庫ファイル　退避中',TO-XCTL
+       SAVFILE FILE-NYSFILF.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'作業実績ファイル退避中',TO-XCTL
+       SAVFILE FILE-SGYFILF.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'売上計上ファイル退避中',TO-XCTL
+       SAVFILE FILE-TOKU.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'仕入計上ファイル退避中',TO-XCTL
+       SAVFILE FILE-TOKUZ.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'合計計上ファイル退避中',TO-XCTL
+       SAVFILE FILE-TOKU.TOKWLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'在庫マスタ　　　退避中',TO-XCTL
+       SAVFILE FILE-ZAMZAIF.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'在庫実績マスタ　退避中',TO-XCTL
+       SAVFILE FILE-ZAMJISF.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'福岡計上Ｆ　　　退避中',TO-XCTL
+       SAVFILE FILE-TOKUFKU.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SAVFILE FILE-TOKUFKS.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SNDMSG MSG-'大阪計上Ｆ　　　退避中',TO-XCTL
+       SAVFILE FILE-TOKUOSU.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED
+       SAVFILE FILE-TOKUOSS.TOKFLIB,TODEV-MO,ADD-@YES,MODE-@USED./
+/.#################################################################./
+/.##ＤＡＴへライブラリ退避の為、資源獲得一次開放                 ##./
+/.#################################################################./
+    RELEASE FILE-SHTDENF.TOKFLIB!@XCL/   /.##売上ﾌｧｲﾙ##./
+                 HSHOTBL.TOKFLIB!@XCL/   /.##商品変換TBL##./
+                 HMEIMS.TOKFLIB!@XCL/    /.##商品名称ﾏｽﾀ##./
+                 HTOKMS.TOKFLIB!@XCL/    /.##取引先ﾏｽﾀ##./
+                 HTENMS.TOKFLIB!@XCL/    /.##店舗ﾏｽﾀ##./
+                 NYKFILF.TOKFLIB!@XCL/   /.##入庫ﾌｧｲﾙ##./
+                 HACHEDF.TOKFLIB!@XCL/   /.##発注ﾍｯﾀﾞﾌｧｲﾙ##./
+                 HACMEIF.TOKFLIB!@XCL/   /.##発注明細ﾌｧｲﾙ##./
+                 NYSFILF.TOKFLIB!@XCL/   /.##入出庫ﾌｧｲﾙ##./
+                 SGYFILF.TOKFLIB!@XCL/   /.##作業実績ﾌｧｲﾙ##./
+                 TOKU.TOKFLIB!@XCL/      /.##売上計上ﾌｧｲﾙ##./
+                 TOKUZ.TOKFLIB!@XCL/     /.##仕入／作業計上ﾌｧｲﾙ##./
+                 ZAMZAIF.TOKFLIB!@XCL/   /.##在庫ﾏｽﾀ##./
+                 ZAMJISF.TOKFLIB!@XCL    /.##在庫ﾏｽﾀ実績##./
+
+/.#################################################################./
+/.##ＤＡＴへライブラリ退避                                       ##./
+/.#################################################################./
+STEP4:
+
+    ?STEP :=   'SAVLIB  '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    SNDMSG MSG-'全データＤＡＴ退避開始',TO-XCTL
+    ?MSG1    := '<<< '
+               && %SBSTR(@SDATEY,1,2) && '/'
+               && %SBSTR(@SDATEY,3,2) && '/'
+               && %SBSTR(@SDATEY,5,2) && ' '
+               && %SBSTR(@STIME,1,2)  && ':'
+               && %SBSTR(@STIME,3,2)  && ':'
+               && %SBSTR(@STIME,5,2)  && ' >>>'
+     SNDMSG  MSG-?MSG1,TOWS-@ORGWS,JLOG-@YES
+    SNDMSG MSG-'ＯＮＬＢＬＩＢ　退避中',TO-XCTL
+    SNDMSG MSG-'ＴＯＫＦＬＩＢ　退避中',TO-XCTL
+    SAVLIB LIB-TOKFLIB/ONLBLIB,TODEV-DAT,ADD-@NO,REWIND-@NO,
+           MODE-@USED
+    SNDMSG MSG-'全データＤＡＴ退避終了',TO-XCTL
+    ?MSG1    := '<<< '
+               && %SBSTR(@SDATEY,1,2) && '/'
+               && %SBSTR(@SDATEY,3,2) && '/'
+               && %SBSTR(@SDATEY,5,2) && ' '
+               && %SBSTR(@STIME,1,2)  && ':'
+               && %SBSTR(@STIME,3,2)  && ':'
+               && %SBSTR(@STIME,5,2)  && ' >>>'
+     SNDMSG  MSG-?MSG1,TOWS-@ORGWS,JLOG-@YES
+/.#################################################################./
+/.##再資源の事前獲得                                             ##./
+/.#################################################################./
+    ASSIGN FILE-SHTDENF.TOKFLIB!@XCL/   /.##売上ﾌｧｲﾙ##./
+                HSHOTBL.TOKFLIB!@XCL/   /.##商品変換TBL##./
+                HMEIMS.TOKFLIB!@XCL/    /.##商品名称ﾏｽﾀ##./
+                HTOKMS.TOKFLIB!@XCL/    /.##取引先ﾏｽﾀ##./
+                HTENMS.TOKFLIB!@XCL/    /.##店舗ﾏｽﾀ##./
+                NYKFILF.TOKFLIB!@XCL/   /.##入庫ﾌｧｲﾙ##./
+                HACHEDF.TOKFLIB!@XCL/   /.##発注ﾍｯﾀﾞﾌｧｲﾙ##./
+                HACMEIF.TOKFLIB!@XCL/   /.##発注明細ﾌｧｲﾙ##./
+                NYSFILF.TOKFLIB!@XCL/   /.##入出庫ﾌｧｲﾙ##./
+                SGYFILF.TOKFLIB!@XCL/   /.##作業実績ﾌｧｲﾙ##./
+                TOKU.TOKFLIB!@XCL/      /.##売上計上ﾌｧｲﾙ##./
+                TOKUZ.TOKFLIB!@XCL/     /.##仕入／作業計上ﾌｧｲﾙ##./
+                ZAMZAIF.TOKFLIB!@XCL/   /.##在庫ﾏｽﾀ##./
+                ZAMJISF.TOKFLIB!@XCL    /.##在庫ﾏｽﾀ実績##./
+
+/.#################################################################./
+/.##計上ファイルクリアチェック                                   ##./
+/.#################################################################./
+STEP41:
+
+/.  ?STEP :=   'SKY3301B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-ACOSCHK1,TOFILE-ACOSCHK1.TOKWLIB
+    CALL      PGM-SKY3301B.TOKELIB,PARA-(?CHK)
+    ?MSGX :=  '?CHK = ' && ?CHK
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    IF        @PGMEC  ^=  0  THEN
+              GOTO ABEND
+    ELSE
+              SNDMSG ?CHK,TO-XCTL.@ORGPROF
+              IF   ?CHK = '1'  THEN
+                   CLRFILE FILE-ACOSWK.TOKWLIB
+                   IF        @PGMEC  ^=  0  THEN
+                        GOTO ABEND
+                   END
+                   CLRFILE FILE-ACOSFILE.TOKWLIB
+                   IF        @PGMEC  ^=  0  THEN
+                        GOTO ABEND
+                   END
+              END
+    END
+                  ./
+/.#################################################################./
+/.##在庫引落（条件マスタの日次日付により在庫引当）               ##./
+/.#################################################################./
+STEP5:
+
+    ?STEP :=   'TNI0020B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-DENJNL6,TOFILE-SHTDENL6.TOKFLIB
+    OVRF      FILE-ZAMZAIL1,TOFILE-ZAMZAIL1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-SHOTBL2,TOFILE-SHOTBL2.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    CALL      PGM-TNI0020B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##売上更新（条件マスタの日次日付により売上計上データ抽出）     ##./
+/.#################################################################./
+STEP6:
+
+    ?STEP :=   'SNI0030B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-DENJNL4,TOFILE-SHTDENL4.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TENMS1,TOFILE-TENMS1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-TOKU,TOFILE-TOKU.TOKFLIB
+    OVRF      FILE-MEIMS1,TOFILE-MEIMS1.TOKFLIB
+    CALL      PGM-TNI0030B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##データＣＯＰＹの為、３分待ち合わせ後、ＣＮＶＦＩＬＥ         ##./
+/.#################################################################./
+CPY:
+
+    SNDMSG MSG-'データＣＯＰＹ待合せ中',TO-XCTL
+    CALL TWAIT3.XUCL
+
+    CNVFILE FILE-TOKU.TOKFLIB,TOFILE-TOKUWK.TOKWLIB,BF-4
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##売上計上データ確認リスト出力                                 ##./
+/.#################################################################./
+STEP7:
+
+    ?STEP :=   'SNI0040L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-TOKU1,TOFILE-TOKU1.TOKFLIB
+    OVRF      FILE-TOKMS3,TOFILE-TOKMS3.TOKFLIB
+    CALL      PGM-SNI0040L.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##入庫データ計上データ作成                                     ##./
+/.#################################################################./
+STEP8:
+
+    ?STEP :=   'SZA0140B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-NYKFILF,TOFILE-NYKFILL1.TOKFLIB
+    OVRF      FILE-HACHEDF,TOFILE-HACHEDL1.TOKFLIB
+    OVRF      FILE-HACMEIF,TOFILE-HACMEIL1.TOKFLIB
+    OVRF      FILE-SHOTBL4,TOFILE-SHOTBL4.TOKFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-TOKU,TOFILE-TOKUZ.TOKFLIB
+    CALL      PGM-SZA0140B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##入出庫／作業実績データ　計上データ作成                       ##./
+/.#################################################################./
+STEP9:
+
+    ?STEP :=   'SZA0200B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-NYSFILF,TOFILE-NYSFILL1.TOKFLIB
+    OVRF      FILE-SGYFILF,TOFILE-SGYFILL1.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-TOKU,TOFILE-TOKUZ.TOKFLIB
+/.  CALL      PGM-SZA0200B.TOKELIB   ./
+    CALL      PGM-SZA0201B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##入庫／入出庫／作業実績データ　計上確認リスト発行             ##./
+/.#################################################################./
+STEP10:
+
+    ?STEP :=   'SNI0050B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-TOKU,TOFILE-TOKUZ.TOKFLIB
+    CALL      SNI0050B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##売上／入庫／入出庫／作業実績データ－＞ワークバックアップ     ##./
+/.#################################################################./
+STEP11:
+
+    ?STEP :=   'STEP11  '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CNVFILE FILE-TOKUWK.TOKWLIB,TOFILE-TOKU.TOKWLIB,ADD-@NO,
+            BF-4
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+STEP12:
+
+    ?STEP :=   'STEP12  '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CNVFILE FILE-TOKUZ.TOKFLIB,TOFILE-TOKU.TOKWLIB,BF-4
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##売上中間ファイルクリア                                       ##./
+/.#################################################################./
+    CLRFILE JHSHENF.TOKFLIB
+
+/.#################################################################./
+/.##売上／仕入／在庫計上データより実績累積Ｆ作成                 ##./
+/.#################################################################./
+/.##実績累積Ｆ作成##./
+STEP13:
+
+    ?STEP :=   'STEP13  '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '## 実績累積Ｆ　作成 ##'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-TOKU,TOFILE-TOKU.TOKWLIB
+    OVRF      FILE-RUISEKF,TOFILE-RUISEKL1.TOKFLIB
+    CALL      PGM-SJS0010B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##実績累積Ｆより、実績集計Ｆ集計                               ##./
+/.#################################################################./
+/.##実績集計ファイル作成                                        ./
+STEP14:
+    ?STEP :=   'STEP14  '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  '## 実績集計Ｆ　集計 ##'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-RUISEKL2,TOFILE-RUISEKL2.TOKFLIB
+    OVRF      FILE-JISSYUL1,TOFILE-JISSYUL1.TOKFLIB
+    CALL      PGM-SJS0030B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.#################################################################./
+/.##プログラム正常終了（資源の開放）                             ##./
+/.#################################################################./
+RTN:  /.資源の解放./
+
+    RELEASE FILE-SHTDENF.TOKFLIB!@XCL/   /.##売上ﾌｧｲﾙ##./
+                 HSHOTBL.TOKFLIB!@XCL/   /.##商品変換TBL##./
+                 HMEIMS.TOKFLIB!@XCL/    /.##商品名称ﾏｽﾀ##./
+                 HTOKMS.TOKFLIB!@XCL/    /.##取引先ﾏｽﾀ##./
+                 HTENMS.TOKFLIB!@XCL/    /.##店舗ﾏｽﾀ##./
+                 NYKFILF.TOKFLIB!@XCL/   /.##入庫ﾌｧｲﾙ##./
+                 HACHEDF.TOKFLIB!@XCL/   /.##発注ﾍｯﾀﾞﾌｧｲﾙ##./
+                 HACMEIF.TOKFLIB!@XCL/   /.##発注明細ﾌｧｲﾙ##./
+                 NYSFILF.TOKFLIB!@XCL/   /.##入出庫ﾌｧｲﾙ##./
+                 SGYFILF.TOKFLIB!@XCL/   /.##作業実績ﾌｧｲﾙ##./
+                 TOKU.TOKFLIB!@XCL/      /.##売上計上ﾌｧｲﾙ##./
+                 TOKUZ.TOKFLIB!@XCL/     /.##仕入／作業計上ﾌｧｲﾙ##./
+                 ZAMZAIF.TOKFLIB!@XCL/   /.##在庫ﾏｽﾀ##./
+                 ZAMJISF.TOKFLIB!@XCL    /.##在庫ﾏｽﾀ実績##./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+/.#################################################################./
+/.##プログラム異常終了（資源の開放－＞ログリスト出力）           ##./
+/.#################################################################./
+ABEND:
+
+    RELEASE FILE-SHTDENF.TOKFLIB!@XCL/   /.##売上ﾌｧｲﾙ##./
+                 HSHOTBL.TOKFLIB!@XCL/   /.##商品変換TBL##./
+                 HMEIMS.TOKFLIB!@XCL/    /.##商品名称ﾏｽﾀ##./
+                 HTOKMS.TOKFLIB!@XCL/    /.##取引先ﾏｽﾀ##./
+                 HTENMS.TOKFLIB!@XCL/    /.##店舗ﾏｽﾀ##./
+                 NYKFILF.TOKFLIB!@XCL/   /.##入庫ﾌｧｲﾙ##./
+                 HACHEDF.TOKFLIB!@XCL/   /.##発注ﾍｯﾀﾞﾌｧｲﾙ##./
+                 HACMEIF.TOKFLIB!@XCL/   /.##発注明細ﾌｧｲﾙ##./
+                 NYSFILF.TOKFLIB!@XCL/   /.##入出庫ﾌｧｲﾙ##./
+                 SGYFILF.TOKFLIB!@XCL/   /.##作業実績ﾌｧｲﾙ##./
+                 TOKU.TOKFLIB!@XCL/      /.##売上計上ﾌｧｲﾙ##./
+                 TOKUZ.TOKFLIB!@XCL/     /.##仕入／作業計上ﾌｧｲﾙ##./
+                 ZAMZAIF.TOKFLIB!@XCL/   /.##在庫ﾏｽﾀ##./
+                 ZAMJISF.TOKFLIB!@XCL    /.##在庫ﾏｽﾀ実績##./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    DMPWSLOG WKSTN-WKSTN001,FROM-@NEWACT
+
+    ?OPR1  :=  '　＃＃＃＃＃＃　日次更新異常終了　＃＃＃＃＃＃　　'
+    ?OPR2  :=  '　日次更新にて異常終了が発生しました。　　　　　　'
+    ?OPR3  :=  '　ログリストが出力されていますので，確認後，　　　'
+    ?OPR4  :=  '　_ナブ・アシストまで連絡して下さい。　　　　　　'
+    ?OPR5  :=  '　異常発生＊異常発生＊異常発生＊異常発生＊異常＊　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    RETURN    PGMEC-@PGMEC
+
+/.#################################################################./
+/.##資源使用時、他端末開放確認メッセージ出力）                   ##./
+/.#################################################################./
+ERR:  /.資源の解放./
+
+    ?OPR1  :=  '　　＃＃＃＃＃＃＃　資源使用中　＃＃＃＃＃＃＃　　'
+    ?OPR2  :=  '　　　　　　　　　　　　　　　　　　　　　　　　　'
+    ?OPR3  :=  '　　他端末にて資源を使用中です。　　　　　　　　　'
+    ?OPR4  :=  '　　全端末の使用状況を確認して下さい。　　　　　　'
+    ?OPR5  :=  '　ＥＮＴＥＲでリスタート，ＰＦ９でプログラム終了　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    GOTO      FILECHK
+

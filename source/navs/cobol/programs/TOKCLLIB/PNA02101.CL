@@ -1,0 +1,344 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    ＨＧ基幹システム　　　　　　　　　   *  ./
+/. *   JOB-ID      :    PNA02101                             *  ./
+/. *   JOB-NAME    :    連携_取消し依頼　　　　　　　　　　 *  ./
+/. *                    （ｵﾝﾗｲﾝ/手書共通）ＨＵＬＦＴ非連携　 *  ./
+/. *   UPDATE      :                                         *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS      ,STRING*08,VALUE-'        '      /.ﾜｰｸｽﾃｰｼｮﾝ文字  ./
+    VAR ?WKSTN   ,NAME                            /.ﾜｰｸｽﾃｰｼｮﾝ名前  ./
+    VAR ?PGMEC   ,INTEGER                         /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ ./
+    VAR ?PGMECX  ,STRING*11                       /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ    ./
+    VAR ?PGMEM   ,STRING*99                       /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ  ./
+    VAR ?MSG     ,STRING*99(6)                    /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX    ,STRING*99                         /.SNDMSG表示用 ./
+    VAR ?CLID    ,STRING*08,VALUE-'PNA02101'        /.CLID         ./
+    VAR ?STEP    ,STRING*08                         /.STEP-ID      ./
+    VAR ?CLNM    ,STRING*40                         /.CL名称       ./
+    VAR ?KEKA1   ,STRING*40                         /.ﾒｯｾｰｼﾞ1      ./
+    VAR ?KEKA2   ,STRING*40                         /.ﾒｯｾｰｼﾞ2      ./
+    VAR ?KEKA3   ,STRING*40                         /.ﾒｯｾｰｼﾞ3      ./
+    VAR ?KEKA4   ,STRING*40                         /.ﾒｯｾｰｼﾞ4      ./
+   /. ↓2012.4.13 排他制御用 ./
+    VAR ?OPR1    ,STRING*50                         /.ﾒｯｾｰｼﾞ1    ./
+    VAR ?OPR2    ,STRING*50                         /.      2    ./
+    VAR ?OPR3    ,STRING*50                         /.      3    ./
+    VAR ?OPR4    ,STRING*50                         /.      4    ./
+    VAR ?OPR5    ,STRING*50                         /.      5    ./
+    VAR ?UMU     ,STRING*1,VALUE-' '                /.有無区分用 ./
+    VAR ?PBUMON  ,STRING*04,VALUE-'    '            /.部門ＣＤ　 ./
+    VAR ?PTANCD  ,STRING*02,VALUE-'  '              /.担当者ＣＤ ./
+    VAR ?PWS     ,STRING*08,VALUE-'        '        /.WKSTN名    ./
+    VAR ?PREN    ,STRING*09,VALUE-'000000000'       /.連携ＮＯ   ./
+    VAR ?PONL    ,STRING*01,VALUE-'0'               /.ｵﾝﾗｲﾝ/手書 ./
+   /. ↑2012.4.13 ./
+
+   /. ↓2012.4.13 疎通確認用 ./
+    VAR ?OKNG    ,STRING*2,VALUE-'  '               /.疎通結果　 ./
+   /. ↑2012.4.13 ./
+
+   /.##パラメタ（個別）##./
+    VAR ?BUMON   ,STRING*04,VALUE-'    '            /.部門名       ./
+    VAR ?TANCD6  ,STRING*06,VALUE-'      '          /.担当者CDWK   ./
+    VAR ?TANCD   ,STRING*02,VALUE-'  '              /.担当者CD     ./
+    VAR ?OUTSEQ  ,STRING*1,VALUE-'2'                /.リスト出力順 ./
+    /. 相手商品順:1､自社商品順:2 ↑ ./
+
+    VAR ?MSG1    ,STRING*74,VALUE-''            /.連携_指定ﾒｯｾｰｼﾞ ./
+    VAR ?MSG2    ,STRING*74,VALUE-''
+    VAR ?MSG3    ,STRING*74,VALUE-''
+    VAR ?MSG4    ,STRING*74,VALUE-''
+    VAR ?MSG5    ,STRING*74,VALUE-''
+    VAR ?MSG1A,STRING*38,VALUE-'・連携_の取消し依頼を行います。　　'
+    VAR ?MSG1B,STRING*38,VALUE-'　　　　　　　　　　　　　　　　　　'
+
+    VAR ?MSG2A,STRING*38,VALUE-'　これを行うと、苗業務システム側で取'
+    VAR ?MSG2B,STRING*38,VALUE-'消し可能であるか判定します。　　　　'
+
+    VAR ?MSG3A,STRING*38,VALUE-'　苗業務システムからの結果通知をお待'
+    VAR ?MSG3B,STRING*38,VALUE-'ち下さい。　　　　　　　　　　　　　'
+
+    VAR ?MSG4A,STRING*38,VALUE-'・取消しできた場合は、連携データの抽'
+    VAR ?MSG4B,STRING*38,VALUE-'・送信をやり直すことができます。　　'
+
+    VAR ?MSG5A,STRING*38,VALUE-'注）開始・終了は同一_を指定して下さ'
+    VAR ?MSG5B,STRING*38,VALUE-'い！　（終了：空打ち）　　　　　　　'
+
+   /.##パラメタ（Ａ）##./
+    VAR ?PA01    ,STRING*06,VALUE-'000000'          /.部門・担当者 ./
+    VAR ?PA02    ,STRING*01,VALUE-'0'               /.ｵﾝﾗｲﾝ手書種別./
+    VAR ?PA03    ,STRING*20,VALUE-'00000000000000000000' /.ﾊﾞｯﾁ_ ./
+    VAR ?PA04    ,STRING*02,VALUE-'00'              /.出荷場所     ./
+    VAR ?PA05    ,STRING*08,VALUE-'00000000'        /.納品日       ./
+    VAR ?PA06    ,STRING*08,VALUE-'00000000'        /.実納品日     ./
+    VAR ?PA07    ,STRING*08,VALUE-'00000000'        /.取引先       ./
+    VAR ?PA08    ,STRING*09,VALUE-'000000000'       /.伝票_1(FROM)./
+    VAR ?PA09    ,STRING*09,VALUE-'000000000'       /.伝票_1(TO)  ./
+    VAR ?PA10    ,STRING*09,VALUE-'000000000'       /.伝票_2(FROM)./
+    VAR ?PA11    ,STRING*09,VALUE-'000000000'       /.伝票_2(TO)  ./
+    VAR ?PA12    ,STRING*09,VALUE-'000000000'       /.伝票_3(FROM)./
+    VAR ?PA13    ,STRING*09,VALUE-'000000000'       /.伝票_3(TO)  ./
+    VAR ?PA14    ,STRING*09,VALUE-'000000000'       /.伝票_4(FROM)./
+    VAR ?PA15    ,STRING*09,VALUE-'000000000'       /.伝票_4(TO)  ./
+    VAR ?PA16    ,STRING*09,VALUE-'000000000'       /.伝票_5(FROM)./
+    VAR ?PA17    ,STRING*09,VALUE-'000000000'       /.伝票_5(TO)  ./
+    VAR ?PA18    ,STRING*01,VALUE-'0'               /.状態         ./
+    VAR ?PA19    ,STRING*09,VALUE-'000000000'       /.連携_       ./
+
+   /.##パラメタ（Ｂ）##./
+    VAR ?PB01    ,STRING*06,VALUE-'000000'          /.部門・担当者 ./
+    VAR ?PB02    ,STRING*01,VALUE-'0'               /.ｵﾝﾗｲﾝ手書種別./
+    VAR ?PB03    ,STRING*09,VALUE-'000000000'       /.連携_(FROM) ./
+    VAR ?PB04    ,STRING*09,VALUE-'000000000'       /.連携_(TO)   ./
+    VAR ?PB05    ,STRING*15,VALUE-'000.000.000.000' /.起動元ＩＰ   ./
+
+/.------------------------------------------------------------------./
+
+/.##実行PG名称ｾｯﾄ##./
+    ?CLNM := '連携_取消し依頼'
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKELIBO/TOKFLIB/TOKKLIB/HULOLIB/HULFLIB/HULWORK1
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?CLID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##ログインユーザー情報取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMON,?TANCD6)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  'ログイン情報取得'
+              GOTO ABEND
+    END
+    ?TANCD := %SBSTR(?TANCD6,1,2)
+
+/.##排他チェック##./
+CKASSIGN:
+
+    ?STEP :=   'CKASSIGN'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ASSIGN    FILE-NARTORF.TOKKLIB!@XCLR
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '排他チェック'
+              GOTO ABENDHIT
+    END
+
+/.##連携_指定（共通）##./
+SNA0090I:
+
+    ?STEP :=   'SNA0090I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ?MSG1  := %SBSTR(?MSG1A,2,36) && %SBSTR(?MSG1B,2,36)
+    ?MSG2  := %SBSTR(?MSG2A,2,36) && %SBSTR(?MSG2B,2,36)
+    ?MSG3  := %SBSTR(?MSG3A,2,36) && %SBSTR(?MSG3B,2,36)
+    ?MSG4  := %SBSTR(?MSG4A,2,36) && %SBSTR(?MSG4B,2,36)
+    ?MSG5  := %SBSTR(?MSG5A,2,36) && %SBSTR(?MSG5B,2,36)
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIBO
+    OVRF      FILE-NARKANL1,TOFILE-NARKANL1.TOKKLIB
+    CALL      PGM-SNA0090I.TOKELIBO,
+              PARA-(?BUMON,?TANCD,
+                    ?MSG1,?MSG2,?MSG3,?MSG4,?MSG5,
+                    ?PB01,?PB02,?PB03,?PB04,?PB05)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0   THEN
+         IF   ?PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              ?MSGX :=  '***   '  && ?CLID  &&   ' END    ***'
+              SNDMSG    ?MSGX,TO-XCTL
+              RETURN
+         ELSE
+              ?KEKA4 :=  '連携_指定（取消し依頼）'
+              GOTO ABEND
+         END
+    END
+    ?MSGX := '# 1:手書/2:ｵﾝﾗｲﾝ　 = ' && ?PB02 && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX := '# 指定連携_(開始) = ' && ?PB03 && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX := '# 指定連携_(終了) = ' && ?PB04 && ' #'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.##取消し依頼データ作成##./
+SNA0210B:
+
+    ?STEP :=   'SNA0210B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-NARRUIL1,TOFILE-NARRUIL1.TOKKLIB
+    OVRF      FILE-NARKANL1,TOFILE-NARKANL1.TOKKLIB
+    OVRF      FILE-NARTORF,TOFILE-NARTORF.TOKKLIB
+    CALL      PGM-SNA0210B.TOKELIBO
+             ,PARA-(?PB01,?PB02,?PB03,?PB04,?PB05)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '取消し依頼データ作成'
+              GOTO ABEND
+    END
+
+SORT0001:
+
+    ?STEP :=   'SORT0001'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    SORTD  INFILE-NARTORF.TOKKLIB,
+           INRL-300,INBF-1,
+           OUTFILE-HGN002H.TOKKLIB,
+           OUTRL-300,OUTBF-1,
+           WORKFILE-SORTWK2.TOKWLIB,
+           SEQ-@YES,
+           KEY-1!9!CA,         /. 連携_         ./
+           KEY1-52!8!DA,       /. 注文日         ./
+           KEY2-84!9!DA,       /. 自社伝票_     ./
+           KEY3-128!2!DA,      /. 伝票行_       ./
+           RCDL-@DSP
+        /.*SELECT-'269!2!D!NE!L-1,181!1!C!NE!L-5'*./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=  0 THEN
+              ?KEKA4 :=  '小売連携取消しデータＳＯＲＴ'
+              GOTO ABEND
+    END
+
+/.##取消データ出力##./
+PFIMPORT:
+
+    ?STEP :=   'PFIMPORT'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    FIMPORT FILE-HGN002H.TOKKLIB,PARA-NAS,UNIT-3
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=  0 THEN
+              ?KEKA4 :=  '取消データ出力'
+              GOTO ABEND
+    END
+
+/.##取消し依頼状態更新##./
+SNA0221B:
+
+    ?STEP :=   'SNA0221B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-PRTFILE,TOFILE-PRTF.TOKELIB
+    OVRF      FILE-NARKANL1,TOFILE-NARKANL1.TOKKLIB
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    CALL      PGM-SNA0221B.TOKSOLIB
+             ,PARA-(?PB01,?PB02,?PB03,?PB04,?PB05)
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=  0  THEN
+              ?KEKA4 :=  '取消し依頼状態更新'
+              GOTO ABEND
+    END
+
+/.##連携ＮＯ強制クリア　##./
+SNACLRNO:
+
+    ?STEP :=   'SNACLRNO'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-SHTDENLE,TOFILE-SHTDENLE.TOKFLIB
+    CALL      PGM-SNACLRNO.TOKELIBO,PARA-(?PB03)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '売上伝票ファイル連携ＮＯ強制クリア'
+              GOTO ABEND
+    END
+
+/.##正常終了処理##./
+RTN:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '連携取消データの抽出処理を行いました。'
+    ?KEKA2 :=  'ＮＡＳシステムを起動し、抽出したデータ'
+    ?KEKA3 :=  'の取込処理を実施して下さい。　　　　　'
+    ?KEKA4 :=  '※忘れず実施願います！！　　　　　　　'
+
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?CLNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?CLID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+/.------------------------------------------------------------------./
+
+/.##異常終了処理##./
+ABEND:
+
+    /. ↓2012.4.13 送信完了前の異常終了時は排他解除./
+    CLRFILE   FILE-NARLOCF.TOKKLIB
+    CLRFILE   FILE-NARLOCF2.TOKKLIB
+    RELEASE   NARLOCF.TOKKLIB!@XCLR
+    /. ↑2012.4.13 ./
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリストを採取後、ＮＡＶへ連絡'
+    ?KEKA3 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?CLNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?CLID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+
+/.##排他時##./
+ABENDHIT:
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    ?KEKA1 :=  '現在、取消処理を他端末で実行中です。'
+    ?KEKA2 :=  '暫く時間を置いて、再度、実行して下さ'
+    ?KEKA3 :=  'い。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?CLNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?CLID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

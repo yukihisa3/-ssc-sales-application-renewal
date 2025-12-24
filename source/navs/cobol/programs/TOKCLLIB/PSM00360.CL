@@ -1,0 +1,210 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    出荷業務                             *  ./
+/. *   JOB-ID      :    PSM00360                             *  ./
+/. *   JOB-NAME    :    出荷明細表（ケース数算出）           *  ./
+/. ***********************************************************  ./
+    PGM
+
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSM00360'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?P1       ,STRING*1,VALUE-'0'        /.出力順    ./
+    VAR       ?P2       ,STRING*8,VALUE-'00000000' /.受信日付  ./
+    VAR       ?P3       ,STRING*4,VALUE-'0000'     /.受信時間  ./
+    VAR       ?P4       ,STRING*8,VALUE-'00000000' /.受信取引先./
+    VAR       ?P5       ,STRING*2,VALUE-'00'       /.倉庫      ./
+    VAR       ?P6       ,STRING*8,VALUE-'00000000' /.納品日    ./
+    VAR       ?P7       ,STRING*5,VALUE-'00000'    /.開始店舗  ./
+    VAR       ?P8       ,STRING*5,VALUE-'00000'    /.終了店舗  ./
+    VAR       ?P9       ,STRING*4,VALUE-'0000'     /.開始部門  ./
+    VAR       ?P10      ,STRING*4,VALUE-'0000'     /.終了部門  ./
+    VAR       ?P11      ,STRING*6,VALUE-'000000'   /.開始_番  ./
+    VAR       ?P12      ,STRING*6,VALUE-'000000'   /.終了_番  ./
+    VAR       ?P13      ,STRING*1,VALUE-' '        /.出力ﾊﾟﾀｰﾝ ./
+    VAR       ?P14      ,STRING*2,VALUE-'00'       /.倉庫(代表)./
+    VAR       ?P15      ,STRING*2,VALUE-'00'       /.倉庫(保存)./
+    VAR       ?PGNM     ,STRING*40                 /.ﾒｯｾｰｼﾞ1   ./
+    VAR       ?KEKA1    ,STRING*40                 /.      2   ./
+    VAR       ?KEKA2    ,STRING*40                 /.      3   ./
+    VAR       ?KEKA3    ,STRING*40                 /.      4   ./
+    VAR       ?KEKA4    ,STRING*40                 /.      5   ./
+    VAR       ?SYUMEIF  ,STRING*5,VALUE-'SYKME'    /.出荷明細F ./
+    VAR       ?SYUMEIFN ,STRING*8,VALUE-'        ' /.出荷明細F ./
+    VAR       ?LIBN     ,NAME                      /.ﾗｲﾌﾞﾗﾘ名./
+    VAR       ?SYUMFILE ,NAME                      /.ﾊﾟﾗﾒﾀﾌｧｲﾙ名./
+    VAR       ?SYUMLIB  ,NAME!MOD                  /.ﾊﾟﾗﾒﾀﾗｲﾌﾞﾗﾘ名./
+    VAR       ?SYUMLIBN ,STRING*17                 /.ﾊﾟﾗﾒﾀﾗｲﾌﾞﾗﾘ名./
+    VAR       ?LIB      ,STRING*8,VALUE-'TOKDTLIB' /.ﾗｲﾌﾞﾗﾘ名./
+    VAR       ?KEYNO    ,STRING*1,VALUE-'1'        /.KEY NO../
+
+/.## ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ ##./
+    ?PGNM :=  '出荷明細書（ケース単位）出力'
+
+/.## ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.## ﾗｲﾌﾞﾗﾘﾘｽﾄ登録ﾞ ##./
+    DEFLIBL TOKELIB/TOKFLIB/TOKELIBO/TOKMDLIB/TOKKLIB/TOKDTLIB
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-TKY1601B.TOKELIB,PARA-(?WS,?P5,?P14)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '倉庫ＣＤ取得'
+              GOTO ABEND
+    END
+
+    ?P15  :=  ?P5
+
+/.##出荷明細発行指示入力##./
+SSM0010I:
+
+    ?STEP :=   'SSM0010I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKMDLIB
+    CALL      PGM-SSM0010I.TOKSOLIB,PARA-(?P2,?P3,?P4,
+                    ?P5,?P14,?P6,?P7,?P8,?P9,?P10,?P11,?P12,?P13)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+         IF  ?PGMEC = 4010        THEN
+             SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+             GOTO RTN
+         ELSE
+             ?KEKA4 :=  '出荷明細発行指示入力'
+             GOTO ABEND
+         END
+    END
+
+    ?MSGX :=  'ﾊﾟﾗ:受信日付    = ' && ?P2
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:受信時間    = ' && ?P3
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:受信取引先  = ' && ?P4
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:倉庫　　　  = ' && ?P5
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:納品日　　  = ' && ?P6
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:開始店舗    = ' && ?P7
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:終了店舗    = ' && ?P8
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:開始部門    = ' && ?P9
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:終了部門    = ' && ?P10
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:開始_番    = ' && ?P11
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:終了_番    = ' && ?P12
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?MSGX :=  'ﾊﾟﾗ:出力区分    = ' && ?P13
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.パラメタファイル名を生成./
+    ?SYUMEIFN := ?SYUMEIF && ?P15 && ?KEYNO      /.ﾌｧｲﾙ名を生成./
+    ?SYUMFILE := %NAME(?SYUMEIFN)               /.名前型に変換./
+    ?LIBN     := %NAME(?LIB)                    /.名前型に変換./
+    ?SYUMLIB  := %NCAT(?SYUMFILE,?LIBN)         /.名前型の結合./
+    ?SYUMLIBN := %STRING(?SYUMLIB)              /.文字列型に変換./
+    ?MSGX     := '## 出荷明細F = ' && ?SYUMLIBN && ' ##'
+    SNDMSG ?MSGX,TO-XCTL.@ORGPROF,SLOG-@YES,JLOG-@YES /.画面に出力./
+
+/.##出荷明細データ初期化##./
+PCLRFILE:
+
+    ?STEP :=   'PCLRFILE'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    CLRFILE FILE-SYKMEIF.TOKDTLIB
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0   THEN
+              ?KEKA4 :=  '出荷明細データ初期化'
+              GOTO ABEND
+    END
+
+/.##出荷明細データ抽出##./
+SSM0020B:
+
+    ?STEP :=   'SSM0020B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF FILE-SYKMEIL1,TOFILE-?SYUMLIB
+    CALL      PGM-SSM0020B.TOKSOLIB,PARA-(?P2,?P3,?P4,
+                    ?P5,?P6,?P7,?P8,?P9,?P10,?P11,?P12)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '出荷明細データ抽出'
+              GOTO ABEND
+    END
+
+/.##出荷明細表作表##./
+SSM0030L:
+
+    ?STEP :=   'SSM0030L'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRF FILE-SYKMEIL2,TOFILE-SYKME012.TOKDTLIB
+    CALL      PGM-SSM0036L.TOKSOLIB,PARA-(?P13)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '出荷明細表作表'
+              GOTO ABEND END
+
+RTN: /.##ﾌﾟﾛｸﾞﾗﾑ正常時、終了ﾒｯｾｰｼﾞ##./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:/.##ﾌﾟﾛｸﾞﾗﾑ異常終了時、終了ﾒｯｾｰｼﾞ##./
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+              /.１２３４５６７８９０１２３４５６７８９０./
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'ログリスト等を採取しＮＡＶへ連絡して下'
+    ?KEKA3 :=  'さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC

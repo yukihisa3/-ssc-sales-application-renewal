@@ -1,0 +1,150 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    実績累積管理                         *  ./
+/. *   JOB-ID      :    CGE00320                             *  ./
+/. *   JOB-NAME    :    実績集計Ｆ削除                       *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'CGE00320'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?JBNM     ,STRING*24|MIXED            /.業務漢字名 ./
+    VAR       ?JBID     ,STRING*10                  /.業務ＩＤ   ./
+    VAR       ?PGID     ,STRING*10                  /.ＰＧＩＤ　 ./
+    VAR       ?OPR1     ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                  /.      2    ./
+    VAR       ?OPR3     ,STRING*50                  /.      3    ./
+    VAR       ?OPR4     ,STRING*50                  /.      4    ./
+    VAR       ?OPR5     ,STRING*50                  /.      5    ./
+    VAR       ?PGNM     ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                  /.      5    ./
+
+/.PG名称ｾｯﾄ./
+
+    ?PGNM  :=  '受払集計ＤＴ－削除処理'
+
+/.ﾗｲﾌﾞﾗﾘﾘｽﾄ登録./
+
+    DEFLIBL TOKELIB/TOKFLIB
+
+/.確認画面./
+PKAKUNIN:
+
+    ?OPR1  :=  '　＃＃＃＃＃　　受払集計Ｆ削除処理　　＃＃＃＃＃　'
+    ?OPR2  :=  '　受払集計データ削除処理を行います。'
+    ?OPR3  :=  '　（データ削除）'
+    ?OPR4  :=  '  確認して下さい。'
+    ?OPR5  :=  '　＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃＃　'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+/.実績集計Ｆ保有期間外データ削除./
+SJS0120B:
+
+    ?STEP :=   'SJS0120B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    SNDMSG MSG-'#＃実績集計Ｆ　削除中＃',TO-XCTL
+
+    OVRF FILE-JISSYUL4,TOFILE-JISSYUL4.TOKFLIB
+    OVRF FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL  SJS0120B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4  :=  '【実績集計Ｆ　削除処理】'
+              GOTO ABEND END
+
+/.実績集計Ｆ保有期間外データ削除./
+PCNDPF1:
+
+    ?STEP :=   'PCNDPF1 '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    SNDMSG MSG-'#＃実績累積Ｆ　圧縮中＃',TO-XCTL
+
+    DACTLF FILE-JISSYUL1.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## DACTLF(JISSYUL1) ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　ＤＡＣＴ１】'
+              GOTO ABEND END
+    DACTLF FILE-JISSYUL2.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## DACTLF(JISSYUL2) ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　ＤＡＣＴ２】'
+              GOTO ABEND END
+    DACTLF FILE-JISSYUL3.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## DACTLF(JISSYUL3) ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　ＤＡＣＴ３】'
+              GOTO ABEND END
+    DACTLF FILE-JISSYUL4.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## DACTLF(JISSYUL4) ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　ＤＡＣＴ４】'
+              GOTO ABEND END
+    CNDPF FILE-JISSYUF.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## CNDPF(JISSYUFG)  ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　圧縮中】'
+              GOTO ABEND END
+    ACTLF FILE-JISSYUL1.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## ACTLF(JISSYUL1)  ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　ＡＣＴ１】'
+              GOTO ABEND END
+    ACTLF FILE-JISSYUL2.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## ACTLF(JISSYUL2)  ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　ＡＣＴ２】'
+              GOTO ABEND END
+    ACTLF FILE-JISSYUL3.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## ACTLF(JISSYUL3)  ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　ＡＣＴ３】'
+              GOTO ABEND END
+    ACTLF FILE-JISSYUL4.TOKFLIB
+    IF        @PGMEC    ^=   0    THEN
+              SNDMSG MSG-'## ACTLF(JISSYUL4)  ERR ##',TO-XCTL
+              ?KEKA4  :=  '【実績集計Ｆ　ＡＣＴ４】'
+              GOTO ABEND END
+
+RTN:
+
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  '更新結果等を確認して下さい。'
+    ?KEKA3 :=  ''
+    ?KEKA4 :=  '（正常終了）'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?KEKA1 :=  '受払集計データの削除処理が異常終了しま'
+    ?KEKA2 :=  'した。この画面のリストを出力して下さい'
+    ?KEKA3 :=  '（ログリストを採取しＮＡＶへ連絡）'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

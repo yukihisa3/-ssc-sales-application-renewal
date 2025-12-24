@@ -1,0 +1,88 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    販売管理・内部統制                   *  ./
+/. *   JOB-ID      :    CSN00100                             *  ./
+/. *   JOB-NAME    :    手書承認入力                         *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?MSGTAN   ,STRING*99
+    VAR       ?MSGBU    ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'CSN00100'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?TANCD    ,STRING*2,VALUE-'  '
+    VAR       ?BUMON    ,STRING*4,VALUE-'    '
+    VAR       ?TANBUM   ,STRING*6
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?NYURYOKU ,STRING*8,VALUE-'        ' /.入力日./
+    VAR       ?STIME    ,STRING*6,VALUE-'      '   /.時刻./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL    TOKELIBO/TOKKLIB/TOKELIB/TOKFLIB
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##部門ｺｰﾄﾞ取得##./
+SKY1602B:
+
+    ?STEP :=   'SKY1602B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1602B.TOKELIBO,PARA-(?WS,?BUMON)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+
+/.##手書承認人力##./
+STEP01:
+
+    ?STEP :=   'SSN0010I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIBO
+    OVRF      FILE-TANMS1,TOFILE-TANMS1.TOKKLIB
+    OVRF      FILE-SHTDENLG,TOFILE-SHTDENLG.TOKFLIB
+    CALL      PGM-SSN0010I.TOKELIBO,PARA-(?TANCD,?BUMON,
+                                    ?NYURYOKU,?STIME)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+
+
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

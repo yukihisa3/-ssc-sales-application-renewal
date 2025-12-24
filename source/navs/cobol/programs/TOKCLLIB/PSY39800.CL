@@ -1,0 +1,127 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    ナフコＥＤＩ　　　　                 *  ./
+/. *   JOB-ID      :    PSY39800                             *  ./
+/. *   JOB-NAME    :    ナフコ受領状況照会　　　　　         *  ./
+/. ***********************************************************  ./
+    PGM (P1-?TOKCD)
+
+    /.##ﾊﾟﾗﾒﾀ定義##./
+    PARA      ?TOKCD    ,STRING*8,IN,VALUE-'00137607'
+
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSY39800'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?SOKCD    ,STRING*2,VALUE-'  '       /.倉庫CD./
+    VAR       ?DSOKCD   ,STRING*2,VALUE-'  '       /.代表倉庫CD./
+    VAR       ?WS       ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR       ?WKSTN    ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR       ?BUMONI   ,STRING*4,VALUE-'    '     /.部門CD./
+    VAR       ?TANTOI   ,STRING*8,VALUE-'        ' /.担当者CD./
+    VAR       ?PGNM     ,STRING*40                 /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                 /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                 /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                 /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                 /.      5    ./
+  /.VAR       ?TOKCD    ,STRING*8,VALUE-'00137607'./
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    ?PGNM := 'ナフコ受領出荷照会'
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKKLIB/TOKELIBO/TOKDLIB/ZAIEXCEL/
+              TOKMDLIB/TOKDTLIB
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?SOKCD,?DSOKCD)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0
+          THEN
+              ?KEKA4 := '倉庫コード取得'
+              GOTO ABEND
+    END
+
+/.##部門ｺｰﾄﾞ担当者ｺｰﾄﾞ取得##./
+SIT9000B:
+
+    ?STEP :=   'SIT9000B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-LOGINUSR,TOFILE-LOGINUSR.@TEMP
+    CALL      PGM-SIT9000B.TOKELIBO,PARA-(?BUMONI,?TANTOI)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0
+          THEN
+              ?KEKA4 := '部門ＣＤ担当者ＣＤ取得'
+              GOTO ABEND
+    END
+
+/.##ナフコ受領状況照会##./
+SSY3980I:
+
+    ?STEP :=   'SSY3980I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    ?MSGX :=  'TOKCD='  && ?TOKCD
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CALL PGM-SSY3980I.TOKSOLIB ,PARA-(?TOKCD)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    IF        ?PGMEC    ^=   0    THEN
+              ?KEKA4 := 'ナフコ受領状況照会'
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-?PGMEC
+
+ABEND:
+
+    ?KEKA1 :=  'ナフコ受領状況照会異常終了しました。'
+    ?KEKA2 :=  ''
+    ?KEKA3 :=  'ログ採取し，ＮＡＶへ連絡して下さい。'
+    OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+    CALL SMG0030I.TOKELIB,
+         PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-?PGMEC
+

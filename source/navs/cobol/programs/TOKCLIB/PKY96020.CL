@@ -1,0 +1,135 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ                                        *  ./
+/. *   SYSTEM-NAME :                                         *  ./
+/. *   JOB-ID      :    PKY96020                             *  ./
+/. *   JOB-NAME    :    ＪＡＮＣＤラベル出力                 *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PKY96020'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?OPR1     ,STRING*50                /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                /.      2    ./
+    VAR       ?OPR3     ,STRING*50                /.      3    ./
+    VAR       ?OPR4     ,STRING*50                /.      4    ./
+    VAR       ?OPR5     ,STRING*50                /.      5    ./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?SOKCD    ,STRING*2,VALUE-'  '          /.自倉庫ｺｰﾄﾞ./
+    VAR ?DSOKCD   ,STRING*2,VALUE-'  '          /.代表倉庫ｺｰﾄﾞ./
+    VAR ?KEYA     ,STRING*1,VALUE-'1'           /.KEY1./
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?FILNM    ,STRING*8,VALUE-'        '
+    VAR ?FILNMH   ,STRING*6,VALUE-'      '
+    VAR ?FILNMD   ,STRING*6,VALUE-'DENPYO'
+    VAR ?FILNMO   ,STRING*5,VALUE-'ZJANC'
+    VAR ?LIBNM    ,STRING*8,VALUE-'TOKFLIB '
+    VAR ?FILID    ,NAME
+    VAR ?LIBID    ,NAME
+    VAR ?JHSDENF  ,NAME!MOD
+    VAR ?JHSDENFN ,STRING*17
+    VAR ?DENPYO   ,NAME!MOD
+    VAR ?DENPYON  ,STRING*17
+    VAR ?ZJANC    ,NAME!MOD
+    VAR ?ZJANCN   ,STRING*17
+    VAR ?ZJANC1   ,NAME!MOD
+    VAR ?ZJANC1N  ,STRING*17
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    DEFLIBL   TOKELIB/TOKFLIB
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?SOKCD,?DSOKCD)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+
+/.##ﾌｧｲﾙ名称取得##./
+FILNMCHG:
+
+    ?MSGX := '## 実行倉庫ｺｰﾄﾞ = ' && ?SOKCD && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+                                      /.##SORT順 FILE##./
+    ?FILNM    :=    ?FILNMO && ?SOKCD
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?ZJANC    :=    %NCAT(?FILID,?LIBID)
+    ?ZJANCN   :=    %STRING(?ZJANC)
+    ?MSGX     :=    '## 中間F(PF)  = ' && ?ZJANCN  && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+                                      /.##SORT順 FILE##./
+    ?FILNM    :=    ?FILNMO && ?SOKCD && ?KEYA
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?ZJANC1   :=    %NCAT(?FILID,?LIBID)
+    ?ZJANC1N  :=    %STRING(?ZJANC1)
+    ?MSGX     :=    '## ユポF(LF1) = ' && ?ZJANC1N && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.  ユポラベル出力                                              ./
+SKY9602B:
+
+    ?STEP :=   'SKY9602B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-ZJANDT1,TOFILE-?ZJANC1
+    OVRPRTF   FILE-PRTF,TOFILE-XU04LP.XUCL,MEDLIB-TOKELIB
+    CALL      PGM-SKY9602B.TOKELIB
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+    ?OPR1  :=  '　ＪＡＮラベルデータを削除します。'
+    ?OPR2  :=  '　ＪＡＮラベルの出力結果はＯＫですか？'
+    ?OPR3  :=  '　出力結果を，確認しデータを削除するか'
+    ?OPR4  :=  '　決定して下さい。'
+    ?OPR5  :=  '　ＥＮＴＥＲ＝削除，ＰＦ９＝削除無し'
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+    /.##ユポラベルデータ削除##./
+    CLRFILE   FILE-?ZJANC
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

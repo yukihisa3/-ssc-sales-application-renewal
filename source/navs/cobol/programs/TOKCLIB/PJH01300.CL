@@ -1,0 +1,83 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    基幹システム改善　　　　　　　　     *  ./
+/. *   JOB-ID      :    PJH01300                             *  ./
+/. *   JOB-NAME    :    日次更新条件パラメタ受渡　　　　　  *  ./
+/. *               :    ＜全社分出力＞                       *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ｴﾗｰｽﾃｲﾀｽ./
+    VAR ?PGMECX   ,STRING*11                    /.ｴﾗｰｽﾃｲﾀｽ変換./
+    VAR ?PGMEM    ,STRING*99                    /.ｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ定義./
+    VAR ?MSGX     ,STRING*99                    /.ﾒｯｾｰｼﾞ定義変換./
+    VAR ?PGMID    ,STRING*8,VALUE-'PJH01300'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.ﾌﾟﾛｸﾞﾗﾑｽﾃｯﾌﾟ./
+    VAR ?IDATE    ,STRING*8,VALUE-'20051219'    /.日付イン./
+    VAR ?ODATE    ,STRING*8,VALUE-'00000000'    /.日付アウト./
+    VAR ?JKKBN    ,STRING*1,VALUE-' '           /.実行区分./
+    VAR ?KDTIME   ,STRING*4,VALUE-'    '        /.起動時間./
+    VAR ?HACDAY   ,STRING*8,VALUE-'        '    /.発注日./
+    VAR ?NOUDAY   ,STRING*8,VALUE-'        '    /.納品日./
+    VAR ?SYUDAY   ,STRING*6,VALUE-'      '      /.出荷日./
+    VAR ?JKKEKA   ,STRING*6,VALUE-'      '      /.実行結果./
+/.###ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ###./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+/.    SNDMSG    ?MSGX,TO-XCTL      ./
+
+    DEFLIBL TOKFLIB/TOKELIB/TOKOBJ
+
+/.##　抽出  ##./
+SJH0130B:
+
+    ?STEP :=   'SJH0130B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JHMNITL1,TOFILE-JHMNITL1.TOKFLIB
+    CALL      PGM-SJH0130B.TOKOBJ,PARA-(?IDATE,?ODATE,?JKKBN,?KDTIME,
+                 ?HACDAY,?NOUDAY,?SYUDAY,?JKKEKA)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+/.##　条件ファイル出力  ##./
+SJH0140B:
+
+    ?STEP :=   'SJH0140B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SJH0140B.TOKOBJ,PARA-(?HACDAY,?NOUDAY,?SYUDAY)
+    IF        @PGMEC    ^=   0
+          THEN
+              GOTO ABEND
+    END
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:  /.ﾌﾟﾛｸﾞﾗﾑ異常終了時処理./
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

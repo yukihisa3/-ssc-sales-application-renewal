@@ -1,0 +1,200 @@
+/. ***********************************************************  ./
+/. *  （株）サカタのタネ                                     *  ./
+/. *   SYSTEM-NAME :    在庫管理システム　　　　　　　       *  ./
+/. *   JOB-NAME    :    日次更新一括在庫引当処理　　　　　   *  ./
+/. *   JOB-ID      :    PJZ01200                             *  ./
+/. *   UPDATE      :                                         *  ./
+/. ***********************************************************  ./
+    PGM  (P1-?JIKKOU)
+
+/.##INパラメタ##./
+    PARA  ?JIKKOU  ,STRING*1,IN,VALUE-' '
+            /.実行区分                               ./
+            /.  '1'    :   確認画面表示     ./
+            /.  '2'    :   バッチ起動　　   ./
+
+/.--------------------------------------------------------------./
+    VAR  ?WS      ,STRING*8,VALUE-'        ' /.ﾜｰｸｽﾃｰｼｮﾝID./
+    VAR  ?WKSTN   ,NAME!MOD                  /.ﾜｰｸｽﾃｰｼｮﾝID./
+    VAR  ?PGMEC   ,INTEGER
+    VAR  ?PGMES   ,STRING*5,VALUE-'     '
+    VAR  ?PGMECX  ,STRING*11
+    VAR  ?PGMEM   ,STRING*99
+    VAR  ?MSG     ,STRING*99(6)
+    VAR  ?MSGX    ,STRING*99
+    VAR  ?PGMID   ,STRING*8,VALUE-'PJZ01200'
+    VAR  ?STEP    ,STRING*8
+/.--------------------------------------------------------------./
+    VAR  ?BUMON   ,STRING*4,VALUE-'    '     /.部門./
+    VAR  ?TANCD8  ,STRING*8,VALUE-'        ' /.部門+担当者./
+    VAR  ?TANCD   ,STRING*2,VALUE-'  '       /.担当者     ./
+    VAR  ?SOKCD   ,STRING*2,VALUE-'00'       /.実行倉庫   ./
+    VAR  ?DSOKCD  ,STRING*2,VALUE-'00'       /.代表倉庫   ./
+/.--------------------------------------------------------------./
+    VAR  ?OPR1    ,STRING*50                 /.ﾒｯｾｰｼﾞ1    ./
+    VAR  ?OPR2    ,STRING*50                 /.      2    ./
+    VAR  ?OPR3    ,STRING*50                 /.      3    ./
+    VAR  ?OPR4    ,STRING*50                 /.      4    ./
+    VAR  ?OPR5    ,STRING*50                 /.      5    ./
+/.--------------------------------------------------------------./
+    VAR  ?MSG1    ,STRING*80                 /.開始終了MSG./
+    VAR  ?PGNM    ,STRING*40                 /.ﾒｯｾｰｼﾞ1    ./
+    VAR  ?KEKA1   ,STRING*40                 /.      2    ./
+    VAR  ?KEKA2   ,STRING*40                 /.      3    ./
+    VAR  ?KEKA3   ,STRING*40                 /.      4    ./
+    VAR  ?KEKA4   ,STRING*40                 /.      5    ./
+/.-----------------------------------------------------------./
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB/TOKDTLIB/TOKELIBO
+
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+CLSTART:
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    CASE  ?JIKKOU     OF
+          #'1'# ?PGNM := '日次更新一括在庫引当処理（手動）'
+          #'2'# ?PGNM := '日次更新一括在庫引当処理（自動）'
+          ELSE  SNDMSG   '！！！！！！！！！！！！！！！！！！',
+                          TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+                SNDMSG   '！実行区分を指定し、実行して下さい！',
+                          TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+                SNDMSG   '！！！！！！！！！！！！！！！！！！',
+                          TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+                RETURN
+    END
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+/.##取込確認画面##./
+SHOM0900:
+
+    ?STEP :=  'SHOM0900'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CASE      ?JIKKOU    OF
+       #'1'#
+           ?OPR1 := '＜日次更新一括在庫引当処理（手動）実行＞'
+           ?OPR2 := ''
+           ?OPR3 := '　全売上データの在庫引当処理を一括で実施し　'
+           ?OPR4 := '　ます。全端末が終了していることを確認し実　'
+           ?OPR5 := '　行願います。'
+           CALL   OHOM0900.TOKELIB,
+                  PARA-(?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+           ?PGMEC := @PGMEC
+           ?PGMES := @PGMES
+           IF        ?PGMEC ^= 0    THEN
+                     ?KEKA4 := '処理確認画面'
+                     GOTO   ABEND
+           END
+    END
+
+
+
+/.##受信残ファイル初期化##./
+PCLRFILE:
+
+    ?STEP :=  'PCLRFILE'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CLRFILE FILE-JYUZANF.TOKDTLIB
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC ^= 0    THEN
+              ?KEKA4 := '受信残ファイル初期化'
+              GOTO   ABEND
+    END
+
+/.##在庫マスタ未出庫数／引当済数　初期化##./
+SJZ0130B:
+
+    ?STEP :=  'SJZ0130B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CALL   PGM-SJZ0130B.TOKSOLIB
+    ?PGMEC := @PGMEC
+    ?PGMES := @PGMES
+    IF        ?PGMEC ^= 0    THEN
+              ?KEKA4 := '在庫マスタ未出庫数／引当済数　初期化'
+              GOTO   ABEND
+    END
+
+/.##一括在庫引当処理##./
+SJZ0120B:
+
+    ?STEP :=  'SJZ0120B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    CALL      PGM-SJZ0120B.TOKSOLIB
+    ?PGMEC    := @PGMEC
+    ?PGMES    := @PGMES
+    IF        ?PGMEC ^= 0    THEN
+              ?KEKA4 := '一括在庫引当処理'
+              GOTO   ABEND
+    END
+
+RTN:
+
+    CASE ?JIKKOU OF
+       #'1'#  ?KEKA1 :=  '一括在庫引当処理が正常終了しました。'
+              ?KEKA2 :=  '受注残状況の確認を行って下さい。'
+              ?KEKA3 :=  ''
+              ?KEKA4 :=  ''
+              OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+              CALL SMG0030I.TOKELIB,
+                   PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+       #'2'#  ?KEKA1 :=  '一括在庫引当処理が正常終了しました。'
+              ?KEKA2 :=  '受注残状況の確認を行って下さい。'
+              ?KEKA3 :=  ''
+              ?KEKA4 :=  ''
+              OVRPRTF FILE-PRTF,TOFILE-PRTF.TOKELIB,MEDLIB-TOKELIB
+              CALL SMG0020L.TOKELIB,
+                   PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    END
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    CASE ?JIKKOU OF
+       #'1'#  ?KEKA1 :=  '一括在庫引当処理が異常終了しました。'
+              ?KEKA2 :=  'ログリストを採取しＮＡＶへ送付願いま'
+              ?KEKA3 :=  'す。'
+              ?KEKA4 :=  ''
+              OVRDSPF FILE-DSPF,TOFILE-DSPF.TOKELIB,MEDLIB-TOKELIB
+              CALL SMG0030I.TOKELIB,
+                   PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+       #'2'#  ?KEKA1 :=  '一括在庫引当処理が異常終了しました。'
+              ?KEKA2 :=  'ログリストを採取しＮＡＶへ送付願いま'
+              ?KEKA3 :=  'す。'
+              ?KEKA4 :=  ''
+              OVRPRTF FILE-PRTF,TOFILE-PRTF.TOKELIB,MEDLIB-TOKELIB
+              CALL SMG0020L.TOKELIB,
+                   PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    END
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO    ?MSGX  := ?MSG(?I)
+              SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES,SLOG-@YES
+    END
+
+    RETURN    PGMEC-?PGMEC
+

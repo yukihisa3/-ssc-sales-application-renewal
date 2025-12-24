@@ -1,0 +1,1380 @@
+***************************************************************
+*    顧客名　　　　　　　：　（株）サカタのタネ殿             *
+*    業務名　　　　　　　：　在庫管理システム                 *
+*    モジュール名　　　　：　在庫照会（受注残照会）新VER      *
+*    作成日／更新日　　　：　18/04/12                         *
+*    作成者／更新者　　　：　ＮＡＶ                           *
+*    処理概要　　　　　　：　在庫を一覧表示する               *
+*                                                             *
+***************************************************************
+ IDENTIFICATION            DIVISION.
+ PROGRAM-ID.               SJZ0041I.
+ AUTHOR.                   N.T.
+ ENVIRONMENT               DIVISION.
+ CONFIGURATION             SECTION.
+ SOURCE-COMPUTER.          K-6500.
+ OBJECT-COMPUTER.          K-6500.
+ SPECIAL-NAMES.
+     CONSOLE     IS        CONS
+     STATION     IS        STA.
+***************************************************************
+ INPUT-OUTPUT              SECTION.
+***************************************************************
+ FILE-CONTROL.
+*在庫マスタ（商品コード・倉庫）
+     SELECT      ZAMZAIL2  ASSIGN    TO        DA-01-VI-ZAMZAIL2
+                           ORGANIZATION        INDEXED
+                           ACCESS    MODE      SEQUENTIAL
+                           RECORD    KEY       ZAI2-F02
+                                               ZAI2-F01
+                                               ZAI2-F03
+                           FILE      STATUS    ZAI2-ST   ZAI2-ST1.
+*在庫マスタ（カナ名称・倉庫・商品コード）
+     SELECT      ZAMZAIL3  ASSIGN    TO        DA-01-VI-ZAMZAIL3
+                           ORGANIZATION        INDEXED
+                           ACCESS    MODE      SEQUENTIAL
+                           RECORD    KEY       ZAI3-F30
+                                               ZAI3-F02
+                                               ZAI3-F01
+                                               ZAI3-F03
+                           FILE      STATUS    ZAI3-ST   ZAI3-ST1.
+*商品名称マスタ
+     SELECT      HMEIMS    ASSIGN    TO        DA-01-VI-MEIMS1
+                           ORGANIZATION        INDEXED
+                           ACCESS    MODE      RANDOM
+                           RECORD    KEY       MEI-F01
+                           FILE      STATUS    MEI-ST    MEI-ST1.
+*条件ファイル
+     SELECT      HJYOKEN   ASSIGN    TO        DA-01-VI-JYOKEN1
+                           ORGANIZATION        INDEXED
+                           ACCESS    MODE      RANDOM
+                           RECORD    KEY       JYOKEN-F01
+                                               JYOKEN-F02
+                           FILE      STATUS    JYKN-ST   JYKN-ST1.
+*倉庫マスタ
+     SELECT      ZSOKMS    ASSIGN    TO        DA-01-VI-ZSOKMS1
+                           ORGANIZATION        INDEXED
+                           ACCESS    MODE      RANDOM
+                           RECORD    KEY       SOK-F01
+                           FILE      STATUS    SOK-ST    SOK-ST1.
+*画面ファイル*
+     SELECT      DSPFILE   ASSIGN    TO        GS-DSPF
+                           SYMBOLIC  DESTINATION        "DSP"
+                           DESTINATION-1       DSP-WS
+                           FORMAT              DSP-FMT
+                           GROUP               DSP-GRP
+                           PROCESSING  MODE    DSP-PRO
+                           UNIT      CONTROL   DSP-UNIT
+                           SELECTED  FUNCTION  DSP-FNC
+                           FILE      STATUS    DSP-ST    DSP-ST1.
+******************************************************************
+ DATA                      DIVISION.
+******************************************************************
+ FILE                      SECTION.
+*在庫マスタ
+ FD  ZAMZAIL2.
+     COPY        ZAMZAIF   OF        XFDLIB
+     JOINING     ZAI2      AS        PREFIX.
+*在庫マスタ
+ FD  ZAMZAIL3.
+     COPY        ZAMZAIF   OF        XFDLIB
+     JOINING     ZAI3      AS        PREFIX.
+*商品名称マスタ
+ FD  HMEIMS.
+     COPY        HMEIMS    OF        XFDLIB
+     JOINING     MEI       AS        PREFIX.
+*条件ファイル
+ FD  HJYOKEN.
+     COPY        HJYOKEN   OF        XFDLIB
+     JOINING     JYOKEN    AS        PREFIX.
+*倉庫マスタ
+ FD  ZSOKMS.
+     COPY        ZSOKMS    OF        XFDLIB
+     JOINING     SOK       AS        PREFIX.
+*画面ファイル
+ FD  DSPFILE.
+     COPY        FJZ00411  OF        XMDLIB.
+******************************************************************
+ WORKING-STORAGE        SECTION.
+******************************************************************
+     COPY        ZAMZAIF   OF        XFDLIB
+     JOINING     ZAI       AS        PREFIX.
+*
+ 01  DSP-AREA.
+     03  DSP-FMT           PIC X(08) VALUE     SPACE.
+     03  DSP-GRP           PIC X(08) VALUE     SPACE.
+     03  DSP-WS            PIC X(08) VALUE     SPACE.
+     03  DSP-WSR           REDEFINES DSP-WS.
+         05  DSP-WS1       PIC X(02).
+         05  DSP-WS2       PIC 9(03).
+         05  DSP-WS3       PIC X(01).
+     03  DSP-PRO           PIC X(02) VALUE     SPACE.
+     03  DSP-UNIT          PIC X(06) VALUE     SPACE.
+     03  DSP-FNC           PIC X(04) VALUE     SPACE.
+     03  DSP-ST            PIC X(02) VALUE     SPACE.
+     03  DSP-ST1           PIC X(04) VALUE     SPACE.
+ 01  MSG-AREA.
+     03  MSG01             PIC N(20) VALUE
+                     NC"無効ＰＦキーです".
+     03  MSG02             PIC N(20) VALUE
+                     NC"対象データ　なし".
+     03  MSG03             PIC N(20) VALUE
+                     NC"検索条件を入力して下さい".
+     03  MSG04             PIC N(20) VALUE
+                     NC"検索条件が重複しています".
+     03  MSG05             PIC N(20) VALUE
+                     NC"指定倉庫コードは扱えません".
+     03  MSG06             PIC N(20) VALUE
+                     NC"前頁はありません".
+     03  MSG07             PIC N(20) VALUE
+                     NC"次頁はありません".
+     03  MSG08             PIC N(20) VALUE
+                     NC"前レコードはありません".
+     03  MSG09             PIC N(20) VALUE
+                     NC"次レコードはありません".
+     03  MSG10             PIC N(20) VALUE
+                     NC"倉庫マスタに存在しません".
+     03  MSG11             PIC N(20) VALUE
+                     NC"指定されたレコードは存在しません".
+     03  MSG12             PIC N(20) VALUE
+                     NC"照会パターン入力エラー".
+     03  MSG13             PIC N(20) VALUE
+                     NC"照会行入力エラー".
+     03  MSG14             PIC N(20) VALUE
+                     NC"指定された行は存在しません".
+ 01  MSG-AREAR             REDEFINES      MSG-AREA.
+     03  MSGIX             PIC N(20)      OCCURS   14.
+*
+ 01  PFKEY-MSG.
+     03  PMSG01            PIC N(30) VALUE
+       NC"_終了".
+     03  PMSG02            PIC N(30) VALUE
+       NC"_取消　_終了　".
+     03  PMSG02R.
+       05  PMSG02A         PIC N(08).
+       05  PMSG02IX        PIC N(01) OCCURS 22.
+*日付／時刻
+ 01  TIME-AREA.
+     03  WK-TIME                  PIC  9(08)  VALUE  ZERO.
+ 01  DATE-AREA.
+     03  WK-YS                    PIC  9(02)  VALUE  ZERO.
+     03  WK-DATE.
+         05  WK-Y                 PIC  9(02)  VALUE  ZERO.
+         05  WK-M                 PIC  9(02)  VALUE  ZERO.
+         05  WK-D                 PIC  9(02)  VALUE  ZERO.
+ 01  DATE-AREAR2       REDEFINES      DATE-AREA.
+     03  SYS-DATE                 PIC  9(08).
+*画面表示日付編集
+ 01  HEN-DATE.
+     03  HEN-DATE-YYYY            PIC  9(04)  VALUE  ZERO.
+     03  FILLER                   PIC  X(01)  VALUE  "/".
+     03  HEN-DATE-MM              PIC  9(02)  VALUE  ZERO.
+     03  FILLER                   PIC  X(01)  VALUE  "/".
+     03  HEN-DATE-DD              PIC  9(02)  VALUE  ZERO.
+*画面表示時刻編集
+ 01  HEN-TIME.
+     03  HEN-TIME-HH              PIC  9(02)  VALUE  ZERO.
+     03  FILLER                   PIC  X(01)  VALUE  ":".
+     03  HEN-TIME-MM              PIC  9(02)  VALUE  ZERO.
+     03  FILLER                   PIC  X(01)  VALUE  ":".
+     03  HEN-TIME-SS              PIC  9(02)  VALUE  ZERO.
+*特販部名称編集
+ 01  HEN-TOKHAN-AREA.
+     03  FILLER                   PIC  N(01)  VALUE  NC"（".
+     03  HEN-TOKHAN               PIC  N(06)  VALUE  SPACE.
+     03  FILLER                   PIC  N(01)  VALUE  NC"）".
+*
+ 01  WK-AREA.
+     03  END-FLG           PIC 9(01) VALUE     ZERO.
+     03  SYORI-FLG         PIC 9(01) VALUE     ZERO.
+     03  SYORI-GROUP       PIC X(04).
+     03  WK-E000-SOKO-CD         PIC X(02)  VALUE SPACE.
+     03  WK-E000-TANA-BN         PIC X(06)  VALUE SPACE.
+     03  E000-KEY.
+       05    E000-KEY-KANA-NM    PIC X(15).
+       05    E000-KEY-SYO-CD.
+         07  E000-KEY-SYOHIN     PIC X(08).
+         07  E000-KEY-HINTAN     PIC X(08).
+       05    E000-KEY-SOKO-CD    PIC X(02).
+     03  PF07-KEY                PIC X(39).
+     03  PF08-KEY                PIC X(39).
+     03  PF11-KEY.
+       05    PF11-KEY-KANA-NM    PIC X(15).
+       05    PF11-KEY-SYO-CD.
+         07  PF11-KEY-SYOHIN     PIC X(08).
+         07  PF11-KEY-HINTAN     PIC X(08).
+       05    PF11-KEY-SOKO-CD    PIC X(02).
+     03  PF12-KEY.
+       05    PF12-KEY-KANA-NM    PIC X(15).
+       05    PF12-KEY-SYO-CD.
+         07  PF12-KEY-SYOHIN     PIC X(08).
+         07  PF12-KEY-HINTAN     PIC X(08).
+       05    PF12-KEY-SOKO-CD    PIC X(02).
+     03  WK-ZAI-SOKO-CD          PIC X(02)  VALUE SPACE.
+     03  WK-ZAI-TANA-BN          PIC X(06)  VALUE SPACE.
+     03  WK-ZAI-KEY.
+       05    WK-ZAI-KEY-KANA-NM  PIC X(15).
+       05    WK-ZAI-KEY-SYO-CD.
+         07  WK-ZAI-KEY-SYOHIN   PIC X(08).
+         07  WK-ZAI-KEY-HINTAN   PIC X(08).
+       05    WK-ZAI-KEY-SOKO-CD  PIC X(02).
+       05    WK-ZAI-KEY-TANA-BN  PIC X(06).
+     03  WK-HEAD-KEY.
+       05    WK-HEAD-KEY-KANA-NM PIC X(15).
+       05    WK-HEAD-KEY-SYO-CD.
+         07  WK-HEAD-KEY-SYOHIN  PIC X(08).
+         07  WK-HEAD-KEY-HINTAN  PIC X(08).
+       05    WK-HEAD-KEY-SOKO-CD PIC X(02).
+     03  WK-MEI-F02G.
+       05  WK-MEI-F02      PIC N(30).
+     03  INV-SW            PIC 9(01) VALUE     ZERO.
+     03  IX01              PIC 9(02) VALUE     ZERO.
+     03  ERR-NO            PIC 9(02) VALUE     ZERO.
+     03  WK-KETA           PIC 9(02) VALUE     ZERO.
+ 01  WK-SHOCD.
+     03  WK-SHO            PIC  X(01)    OCCURS  8.
+ 01  IX                    PIC  9(02).
+ 01  WK-GYO.
+     03  WK-GYO-SU         PIC  9(01).
+ 01  WK-TANA.
+     03  WK-TANA1          PIC  X(01).
+     03  FILLER            PIC  X(01)    VALUE "-".
+     03  WK-TANA2          PIC  X(03).
+     03  FILLER            PIC  X(01)    VALUE "-".
+     03  WK-TANA3          PIC  X(02).
+ 01  TOTAL-AREA.
+     03  TTL-F04           PIC S9(11)V99.  *>現在庫数
+     03  TTL-F05           PIC S9(11)V99.  *>前月末在庫
+     03  TTL-F07           PIC S9(11)V99.  *>当月入庫数
+     03  TTL-F15           PIC S9(11)V99.  *>前月入庫数
+     03  TTL-F08           PIC S9(11)V99.  *>当月出庫数
+     03  TTL-F16           PIC S9(11)V99.  *>前月出庫数
+     03  TTL-F26           PIC S9(11)V99.  *>未入庫数
+     03  TTL-F27           PIC S9(11)V99.  *>未出庫数
+     03  TTL-F28           PIC S9(11)V99.  *>引当済数
+     03  TTL-F99           PIC S9(11)V99.  *>引当可能在庫数
+ 01  ST-AREA.
+     03  IN-DATA           PIC X(01).
+     03  ZAI2-ST           PIC X(02).
+     03  ZAI2-ST1          PIC X(04).
+     03  ZAI3-ST           PIC X(02).
+     03  ZAI3-ST1          PIC X(04).
+     03  MEI-ST            PIC X(02).
+     03  MEI-ST1           PIC X(04).
+     03  JYKN-ST           PIC X(02).
+     03  JYKN-ST1          PIC X(04).
+     03  SOK-ST            PIC X(02).
+     03  SOK-ST1           PIC X(04).
+*
+     03  FILE-ERR1         PIC N(20) VALUE
+                     NC"画面ファイル異常！".
+     03  FILE-ERR2         PIC N(20) VALUE
+                     NC"商品在庫マスタ異常！".
+     03  FILE-ERR3         PIC N(20) VALUE
+                     NC"商品在庫マスタ（カナ名称）異常！".
+     03  FILE-ERR4         PIC N(20) VALUE
+                     NC"商品名称マスタ異常！".
+     03  FILE-ERR5         PIC N(10) VALUE
+                     NC"条件ファイル異常！".
+     03  FILE-ERR6         PIC N(10) VALUE
+                     NC"倉庫マスタ異常！".
+ 01  PA-MEISAI.
+     03  PA-SOKCD                 PIC  X(02).
+     03  PA-DSOKCD                PIC  X(02).
+     03  PA-SHOCD                 PIC  X(08).
+     03  PA-HINCD1                PIC  X(05).
+     03  PA-HINCD2                PIC  X(02).
+     03  PA-HINCD3                PIC  X(01).
+     03  PA-TOKCD                 PIC  9(08).
+     03  PA-TANA                  PIC  X(06).
+*#2018/04/27 NAV ST
+     03  PA-NDATE                 PIC  9(08).
+*#2018/04/27 NAV ED
+*日付変換サブルーチン用ワーク
+ 01  LINK-IN-KBN           PIC X(01).
+ 01  LINK-IN-YMD6          PIC 9(06).
+ 01  LINK-IN-YMD8          PIC 9(08).
+ 01  LINK-OUT-RET          PIC X(01).
+ 01  LINK-OUT-YMD          PIC 9(08).
+******************************************************************
+ LINKAGE                SECTION.
+******************************************************************
+ 01  LINK-SOKCD            PIC X(02).
+ 01  LINK-DSOKCD           PIC X(02).
+******************************************************************
+ PROCEDURE              DIVISION       USING     LINK-SOKCD
+                                                 LINK-DSOKCD.
+******************************************************************
+*             ファイルエラー処理
+******************************************************************
+ DECLARATIVES.
+ ZAI2-ERR               SECTION.
+     USE           AFTER     EXCEPTION PROCEDURE         ZAMZAIL2.
+     DISPLAY       ZAI2-ST   UPON      STA.
+     DISPLAY       ZAI2-ST1  UPON      STA.
+     DISPLAY       FILE-ERR2 UPON      STA.
+     ACCEPT        IN-DATA   FROM      STA.
+     MOVE          4000      TO        PROGRAM-STATUS.
+     STOP          RUN.
+ ZAI3-ERR               SECTION.
+     USE           AFTER     EXCEPTION PROCEDURE         ZAMZAIL3.
+     DISPLAY       ZAI3-ST   UPON      STA.
+     DISPLAY       ZAI3-ST1  UPON      STA.
+     DISPLAY       FILE-ERR3 UPON      STA.
+     ACCEPT        IN-DATA   FROM      STA.
+     MOVE          4000      TO        PROGRAM-STATUS.
+     STOP          RUN.
+ MEI-ERR                SECTION.
+     USE           AFTER     EXCEPTION PROCEDURE         HMEIMS.
+     DISPLAY       MEI-ST    UPON      STA.
+     DISPLAY       MEI-ST1   UPON      STA.
+     DISPLAY       FILE-ERR4 UPON      STA.
+     ACCEPT        IN-DATA   FROM      STA.
+     MOVE          4000      TO        PROGRAM-STATUS.
+     STOP          RUN.
+ JYKN-ERR               SECTION.
+     USE           AFTER     EXCEPTION PROCEDURE         HJYOKEN.
+     DISPLAY       JYKN-ST   UPON      STA.
+     DISPLAY       JYKN-ST1  UPON      STA.
+     DISPLAY       FILE-ERR5 UPON      STA.
+     ACCEPT        IN-DATA   FROM      STA.
+     MOVE          4000      TO        PROGRAM-STATUS.
+     STOP          RUN.
+ SOK-ERR                SECTION.
+     USE           AFTER     EXCEPTION PROCEDURE         ZSOKMS.
+     DISPLAY       SOK-ST    UPON      STA.
+     DISPLAY       SOK-ST1   UPON      STA.
+     DISPLAY       FILE-ERR6 UPON      STA.
+     ACCEPT        IN-DATA   FROM      STA.
+     MOVE          4000      TO        PROGRAM-STATUS.
+     STOP          RUN.
+ DSP-ERR                SECTION.
+     USE           AFTER     EXCEPTION PROCEDURE         DSPFILE.
+     DISPLAY       DSP-ST    UPON      STA.
+     DISPLAY       DSP-ST1   UPON      STA.
+     DISPLAY       FILE-ERR1 UPON      STA.
+     ACCEPT        IN-DATA   FROM      STA.
+     MOVE          4000      TO        PROGRAM-STATUS.
+     STOP          RUN.
+ END DECLARATIVES.
+******************************************************************
+*             メイン
+******************************************************************
+ SHORI-SEC              SECTION.
+     PERFORM       INIT-SEC.
+     PERFORM       MAIN-SEC       UNTIL     END-FLG   =   9.
+     PERFORM       END-SEC.
+     STOP          RUN.
+ SHORI-EXIT.
+     EXIT.
+******************************************************************
+*             初期処理
+******************************************************************
+ INIT-SEC               SECTION.
+     OPEN     INPUT     ZAMZAIL2
+                        ZAMZAIL3
+                        HMEIMS
+                        HJYOKEN
+                        ZSOKMS
+              I-O       DSPFILE.
+*システム日付・時刻の取得
+     ACCEPT   WK-DATE           FROM   DATE.
+     MOVE     "3"                 TO   LINK-IN-KBN.
+     MOVE     WK-DATE             TO   LINK-IN-YMD6.
+     MOVE     ZERO                TO   LINK-IN-YMD8.
+     MOVE     ZERO                TO   LINK-OUT-RET.
+     MOVE     ZERO                TO   LINK-OUT-YMD.
+     CALL     "SKYDTCKB"       USING   LINK-IN-KBN
+                                       LINK-IN-YMD6
+                                       LINK-IN-YMD8
+                                       LINK-OUT-RET
+                                       LINK-OUT-YMD.
+     MOVE      LINK-OUT-YMD       TO   DATE-AREA.
+*画面表示日付編集
+     MOVE      SYS-DATE(1:4)      TO   HEN-DATE-YYYY.
+     MOVE      SYS-DATE(5:2)      TO   HEN-DATE-MM.
+     MOVE      SYS-DATE(7:2)      TO   HEN-DATE-DD.
+*システム日付取得
+     ACCEPT    WK-TIME          FROM   TIME.
+*画面表示時刻編集
+     MOVE      WK-TIME(1:2)       TO   HEN-TIME-HH.
+     MOVE      WK-TIME(3:2)       TO   HEN-TIME-MM.
+     MOVE      WK-TIME(5:2)       TO   HEN-TIME-SS.
+*特販部名称編集
+     MOVE     SPACE               TO   JYOKEN-REC.
+     INITIALIZE                        JYOKEN-REC.
+     MOVE    "99"                 TO   JYOKEN-F01.
+     MOVE    "BUMON"              TO   JYOKEN-F02.
+     READ     HJYOKEN
+       INVALID KEY
+              MOVE NC"＊＊＊＊＊＊"   TO   HEN-TOKHAN
+       NOT INVALID KEY
+              MOVE JYOKEN-F03         TO   HEN-TOKHAN
+     END-READ.
+*
+     PERFORM            DSP-INIT-SEC.
+     MOVE    "HEAD"               TO   SYORI-GROUP.
+ INIT-EXIT.
+     EXIT.
+******************************************************************
+*             初期画面　表示
+******************************************************************
+ DSP-INIT-SEC           SECTION.
+     MOVE     SPACE               TO   FJZ00411.
+     MOVE     HEN-DATE            TO   SDATE.
+     MOVE     HEN-TIME            TO   STIME.
+     MOVE     HEN-TOKHAN-AREA     TO   TOKHAN.
+*
+     IF       LINK-DSOKCD    =   "01"  OR  "88"
+**************CONTINUE
+              IF  LINK-DSOKCD = "88"
+                  MOVE   LINK-SOKCD   TO   SOKCD  SOK-F01
+                  READ      ZSOKMS
+                    INVALID
+                       CONTINUE
+                    NOT  INVALID
+                       MOVE  SOK-F02  TO   SOKNM
+                  END-READ
+              END-IF
+     ELSE
+              MOVE   LINK-SOKCD   TO   SOKCD  SOK-F01
+              READ      ZSOKMS
+                INVALID
+                   CONTINUE
+                NOT  INVALID
+                   MOVE  SOK-F02  TO   SOKNM
+              END-READ
+     END-IF.
+*
+     MOVE    "FJZ00411"           TO   DSP-FMT.
+     MOVE    "SCREEN"             TO   DSP-GRP.
+     MOVE    "CL"                 TO   DSP-PRO.
+     WRITE    FJZ00411.
+ DSP-INIT-EXIT.
+     EXIT.
+******************************************************************
+*             主処理
+******************************************************************
+ MAIN-SEC               SECTION.
+     MOVE     ZERO                TO   ERR-NO.
+     EVALUATE      SYORI-GROUP
+       WHEN       "HEAD"
+              PERFORM        HEAD-SEC
+       WHEN       "BODY"
+              PERFORM        BODY-SEC
+     END-EVALUATE.
+ MAIN-EXIT.
+     EXIT.
+******************************************************************
+*             ヘッド処理
+******************************************************************
+ HEAD-SEC               SECTION.
+*ヘッド部入力
+     PERFORM            PFK-DSP-SEC.
+     IF       LINK-DSOKCD    =   "01"  OR  "88"
+              CONTINUE
+     ELSE
+*##2001/02/27 NAV START ##*
+              MOVE   LINK-SOKCD   TO   SOKCD  SOK-F01
+              READ      ZSOKMS
+                INVALID
+                   CONTINUE
+                NOT  INVALID
+                   MOVE  SOK-F02  TO   SOKNM
+              END-READ
+              MOVE  "HEAD"        TO   DSP-GRP
+              PERFORM DSP-WR-SEC
+*##2001/02/27 NAV END   ##*
+              MOVE  "X"           TO   EDIT-STATUS  OF  SOKCD
+     END-IF.
+     MOVE    "HEAD"               TO   DSP-GRP.
+     PERFORM            DSP-RD-SEC.
+     EVALUATE      DSP-FNC
+     WHEN         "F005"
+              MOVE  9             TO   END-FLG
+                                  GO   TO   HEAD-EXIT
+     WHEN         "E000"
+              CONTINUE
+     WHEN          OTHER
+              MOVE   1            TO   ERR-NO
+              PERFORM   ERR-DSP-SEC
+                                  GO   TO   HEAD-EXIT
+     END-EVALUATE.
+*検索条件 CHECK
+     MOVE    "M"                  TO   EDIT-OPTION  OF  SOKCD.
+     MOVE    "M"                  TO   EDIT-OPTION  OF  SHOCD.
+     MOVE    "M"                  TO   EDIT-OPTION  OF  KANANM.
+     MOVE    " "                  TO   EDIT-CURSOR  OF  SOKCD.
+     MOVE    " "                  TO   EDIT-CURSOR  OF  SHOCD.
+     MOVE    " "                  TO   EDIT-CURSOR  OF  KANANM.
+*倉庫コード
+     MOVE    SPACE                TO   SOKNM.
+     IF       SOKCD          NOT  =    SPACE
+              MOVE  SOKCD         TO   SOK-F01
+              READ      ZSOKMS
+                INVALID
+                        IF   ERR-NO    =    ZERO
+                             MOVE  10  TO   ERR-NO
+                        END-IF
+                        MOVE "R"  TO   EDIT-OPTION  OF  SOKCD
+                        MOVE "C"  TO   EDIT-CURSOR  OF  SOKCD
+                NOT INVALID
+                        MOVE SOK-F02   TO  SOKNM
+              END-READ
+     END-IF.
+*
+     MOVE     LOW-VALUE           TO   PF07-KEY  PF11-KEY.
+     MOVE     SPACE               TO   PF08-KEY  PF12-KEY.
+*商品コード・カナ名称
+     IF       SHOCD    NOT =  SPACE
+              MOVE   SHOCD        TO  WK-SHOCD
+              PERFORM          UNTIL  WK-SHO(8) NOT = SPACE
+                 PERFORM VARYING IX FROM 7 BY -1 UNTIL IX = 0
+                    MOVE   WK-SHO(IX)       TO  WK-SHO(IX + 1)
+                 END-PERFORM
+                 MOVE      ZERO             TO  WK-SHO(1)
+              END-PERFORM
+              MOVE  WK-SHOCD      TO  SHOCD
+     END-IF.
+     EVALUATE TRUE
+     WHEN   ( SHOCD               =    SPACE )  AND
+            ( KANANM              =    SPACE )
+              IF   ERR-NO         =    ZERO
+                   MOVE  3        TO   ERR-NO
+              END-IF
+              MOVE   "C"          TO   EDIT-CURSOR  OF  SHOCD
+     WHEN   ( SHOCD          NOT  =    SPACE )  AND
+            ( KANANM         NOT  =    SPACE )
+              IF   ERR-NO         =    ZERO
+                   MOVE  4        TO   ERR-NO
+              END-IF
+              MOVE   "R"          TO   EDIT-OPTION  OF  SHOCD
+              MOVE   "R"          TO   EDIT-OPTION  OF  KANANM
+              MOVE   "C"          TO   EDIT-CURSOR  OF  SHOCD
+     WHEN     SHOCD          NOT  =    SPACE
+              MOVE  "1"                TO   SYORI-FLG
+              MOVE  SHOCD              TO   PF12-KEY-SYO-CD
+              IF    SOKCD         NOT  =   SPACE
+                    MOVE  SOKCD        TO   PF12-KEY-SOKO-CD
+              END-IF
+              MOVE  PF12-KEY           TO   WK-HEAD-KEY
+     WHEN     KANANM         NOT  =    SPACE
+              PERFORM VARYING WK-KETA FROM 15 BY -1
+                      UNTIL ( WK-KETA               =  1     ) OR
+                            ( KANANM(WK-KETA:1) NOT =  SPACE )
+                      CONTINUE
+              END-PERFORM
+              MOVE  "2"                TO   SYORI-FLG
+              MOVE  KANANM             TO   PF12-KEY-KANA-NM
+              IF    SOKCD         NOT  =   SPACE
+                    MOVE  SOKCD        TO   PF12-KEY-SOKO-CD
+              END-IF
+              MOVE  PF12-KEY           TO   WK-HEAD-KEY
+     END-EVALUATE.
+*
+     IF       ERR-NO              =    ZERO
+              PERFORM   NEXT-REC-SEC
+              MOVE  LOW-VALUE     TO   PF11-KEY
+              MOVE  E000-KEY      TO   WK-HEAD-KEY
+              IF   ERR-NO         =    ZERO
+                   MOVE  "BODY"   TO   SYORI-GROUP
+              ELSE
+                   IF   ERR-NO    =    9
+                        MOVE  2        TO   ERR-NO
+                   ELSE
+                        MOVE  11       TO   ERR-NO
+                        MOVE  E000-KEY TO   PF12-KEY
+                        MOVE LOW-VALUE TO   E000-KEY
+                        MOVE  "BODY"   TO   SYORI-GROUP
+                   END-IF
+              END-IF
+     END-IF.
+     MOVE    "HEAD"               TO   DSP-GRP.
+     PERFORM            DSP-WR-SEC.
+     PERFORM            ERR-DSP-SEC.
+     IF       ERR-NO              =    0
+              MOVE  "BODY"        TO   DSP-GRP
+              PERFORM   DSP-WR-SEC
+     END-IF.
+ HEAD-EXIT.
+     EXIT.
+******************************************************************
+*             ボディ処理
+******************************************************************
+ BODY-SEC               SECTION.
+*ボディ部入力
+     PERFORM            PFK-DSP-SEC.
+     MOVE    "BODY"               TO   DSP-GRP.
+     PERFORM            DSP-RD-SEC.
+     EVALUATE      DSP-FNC
+     WHEN         "F005"
+              MOVE  9             TO   END-FLG
+                                  GO   TO   BODY-EXIT
+     WHEN         "F004"
+***QQ         PERFORM   DSP-INIT-SEC
+              MOVE      SPACE     TO   HEADG
+              MOVE      SPACE     TO   BODYG
+              MOVE      SPACE     TO   KAKUG
+              MOVE     "SCREEN"   TO   DSP-GRP
+              PERFORM   DSP-WR-SEC
+              MOVE     "HEAD"     TO   SYORI-GROUP
+                                  GO   TO   BODY-EXIT
+     WHEN         "E000"
+               PERFORM  MEISAI-CHK-SEC
+**            CONTINUE
+     WHEN         "F011"
+              PERFORM   BEFORE-REC-SEC
+     WHEN         "F012"
+              PERFORM   NEXT-REC-SEC
+     WHEN         "F007"
+              PERFORM   BEFORE-PAGE-SEC
+     WHEN         "F008"
+              PERFORM   NEXT-PAGE-SEC
+     WHEN          OTHER
+              MOVE   1            TO   ERR-NO
+     END-EVALUATE.
+     IF       ERR-NO              =    0
+              MOVE  "BODY"        TO   DSP-GRP
+              PERFORM   DSP-WR-SEC
+     END-IF.
+     PERFORM            ERR-DSP-SEC.
+ BODY-EXIT.
+     EXIT.
+******************************************************************
+*             前レコード処理
+******************************************************************
+ BEFORE-REC-SEC         SECTION.
+*
+     IF       PF11-KEY            =    LOW-VALUE
+     OR       PF11-KEY            <    WK-HEAD-KEY
+              MOVE  8             TO   ERR-NO
+                                  GO   TO   BEFORE-REC-EXIT
+     END-IF.
+     MOVE     ZERO                TO   INV-SW.
+     MOVE     PF11-KEY            TO   WK-ZAI-KEY.
+     PERFORM            ZAIMS-START-SEC.
+*
+     IF       INV-SW              =    1
+     OR       WK-ZAI-KEY(1:33)    <    WK-HEAD-KEY
+              MOVE  8             TO   ERR-NO
+                                  GO   TO   BEFORE-REC-EXIT
+     END-IF.
+     MOVE     E000-KEY            TO   PF12-KEY.
+     MOVE     WK-ZAI-KEY          TO   E000-KEY.
+     MOVE     WK-ZAI-SOKO-CD      TO   WK-E000-SOKO-CD.
+     MOVE     WK-ZAI-TANA-BN      TO   WK-E000-TANA-BN.
+     MOVE     LOW-VALUE           TO   PF07-KEY.
+     PERFORM            HEAD-SET-SEC.
+     MOVE     SPACE               TO   BODYG.
+     MOVE     SPACE               TO   KAKUG.
+     MOVE     1                   TO   IX01.
+     IF       SOKCD               =   SPACE
+         PERFORM        TOTAL-ADD-SEC
+         PERFORM        TOTAL-SET-SEC
+         MOVE  ZERO               TO   INV-SW
+         MOVE  E000-KEY           TO   WK-ZAI-KEY
+         MOVE  WK-E000-SOKO-CD    TO   WK-ZAI-KEY-SOKO-CD
+         MOVE  WK-E000-TANA-BN    TO   WK-ZAI-KEY-TANA-BN
+         PERFORM        ZAIMS-START-SEC
+     END-IF.
+     PERFORM       VARYING   IX01      FROM      IX01 BY   1
+                   UNTIL     IX01           >    6
+                   OR        INV-SW         =    1
+                   OR        E000-KEY  NOT  =    WK-ZAI-KEY(1:33)
+              PERFORM   BODY-SET-SEC
+              MOVE  WK-ZAI-KEY    TO   PF08-KEY
+              MOVE  ZAI-F01       TO   PF08-KEY(32:2)
+              PERFORM   ZAIMS-READ-SEC
+     END-PERFORM.
+     IF       INV-SW              =    0
+     AND      E000-KEY            =    WK-ZAI-KEY(1:33)
+              CONTINUE
+     ELSE
+              MOVE  HIGH-VALUE    TO   PF08-KEY
+     END-IF.
+     MOVE     ZERO                TO   INV-SW.
+     PERFORM            BEFORE-REC-SEARCH.
+*
+     IF       INV-SW              =    0
+     AND      WK-ZAI-KEY(1:33)    >=   WK-HEAD-KEY
+         MOVE  WK-ZAI-KEY         TO   PF11-KEY
+     ELSE
+         MOVE  LOW-VALUE          TO   PF11-KEY
+     END-IF.
+ BEFORE-REC-EXIT.
+     EXIT.
+******************************************************************
+*             次レコード処理
+******************************************************************
+ NEXT-REC-SEC           SECTION.
+     IF       PF12-KEY            =    HIGH-VALUE
+              MOVE  9             TO   ERR-NO
+                                  GO   TO   NEXT-REC-EXIT
+     END-IF.
+     MOVE     ZERO                TO   INV-SW.
+     MOVE     PF12-KEY            TO   WK-ZAI-KEY.
+     PERFORM            ZAIMS-START-SEC.
+     IF       INV-SW              =    1
+              MOVE  9             TO   ERR-NO
+                                  GO   TO   NEXT-REC-EXIT
+     END-IF.
+     MOVE     E000-KEY            TO   PF11-KEY.
+     MOVE     WK-ZAI-KEY          TO   E000-KEY.
+     MOVE     WK-ZAI-SOKO-CD      TO   WK-E000-SOKO-CD.
+     MOVE     WK-ZAI-TANA-BN      TO   WK-E000-TANA-BN.
+     MOVE     LOW-VALUE           TO   PF07-KEY.
+     MOVE     HIGH-VALUE          TO   PF08-KEY.
+     IF       SYORI-GROUP         =   "HEAD"
+         IF ( SYORI-FLG           =    1
+         AND  SHOCD               <    WK-ZAI-KEY-SYOHIN  )
+         OR ( SYORI-FLG           =    2
+         AND  KANANM(1:WK-KETA)   <
+                                  WK-ZAI-KEY-KANA-NM(1:WK-KETA) )
+              MOVE  11            TO   ERR-NO
+                                  GO   TO   NEXT-REC-EXIT
+         END-IF
+     END-IF.
+     PERFORM            HEAD-SET-SEC.
+     MOVE     SPACE               TO   BODYG.
+     MOVE     SPACE               TO   KAKUG.
+     MOVE     1                   TO   IX01.
+     IF       SOKCD               =   SPACE
+         PERFORM        TOTAL-ADD-SEC
+         PERFORM        TOTAL-SET-SEC
+         MOVE  ZERO               TO   INV-SW
+         MOVE  E000-KEY           TO   WK-ZAI-KEY
+         MOVE  WK-E000-SOKO-CD    TO   WK-ZAI-KEY-SOKO-CD
+         MOVE  WK-E000-TANA-BN    TO   WK-ZAI-KEY-TANA-BN
+         PERFORM        ZAIMS-START-SEC
+     END-IF.
+     PERFORM       VARYING   IX01      FROM      IX01 BY   1
+                   UNTIL     IX01           >    6
+                   OR        INV-SW         =    1
+                   OR        E000-KEY  NOT  =    WK-ZAI-KEY(1:33)
+              PERFORM   BODY-SET-SEC
+              MOVE  WK-ZAI-KEY    TO   PF08-KEY
+              MOVE  ZAI-F01       TO   PF08-KEY(32:2)
+              PERFORM   ZAIMS-READ-SEC
+     END-PERFORM.
+     IF       INV-SW              =    0
+     AND      E000-KEY            =    WK-ZAI-KEY(1:33)
+              CONTINUE
+     ELSE
+              MOVE  HIGH-VALUE    TO   PF08-KEY
+     END-IF.
+     MOVE     ZERO                TO   INV-SW.
+     PERFORM            NEXT-REC-SEARCH.
+     IF       INV-SW              =    0
+         MOVE  WK-ZAI-KEY         TO   PF12-KEY
+     ELSE
+         MOVE  HIGH-VALUE         TO   PF12-KEY
+     END-IF.
+ NEXT-REC-EXIT.
+     EXIT.
+******************************************************************
+*             前頁処理
+******************************************************************
+ BEFORE-PAGE-SEC        SECTION.
+     IF       PF07-KEY            =    LOW-VALUE
+              MOVE  6             TO   ERR-NO
+                                  GO   TO   BEFORE-PAGE-EXIT
+     END-IF.
+     MOVE     ZERO                TO   INV-SW.
+     MOVE     PF07-KEY            TO   WK-ZAI-KEY.
+     PERFORM            ZAIMS-START-RVS.
+     IF       INV-SW              =    0
+         PERFORM        ZAIMS-READ-SEC
+     END-IF.
+     IF       INV-SW              =    1
+         MOVE  6                  TO   ERR-NO
+                                  GO   TO   BEFORE-PAGE-EXIT
+     END-IF.
+*
+     IF       SOKCD               =   SPACE
+         MOVE  5                  TO   IX01
+     ELSE
+         MOVE  6                  TO   IX01
+     END-IF.
+     PERFORM       VARYING   IX01      FROM      IX01 BY   -1
+                   UNTIL     IX01           <    1
+                   OR        INV-SW         =    1
+                   OR        E000-KEY       >    WK-ZAI-KEY(1:33)
+         MOVE  WK-ZAI-KEY         TO   PF07-KEY
+         MOVE  ZAI-F01            TO   PF07-KEY(32:2)
+         PERFORM        ZAIMS-READ-SEC
+     END-PERFORM.
+     IF       INV-SW              =    1
+     OR       E000-KEY            >    WK-ZAI-KEY(1:33)
+         MOVE  E000-KEY           TO   WK-ZAI-KEY
+         MOVE  LOW-VALUE          TO   PF07-KEY
+         MOVE  ZERO               TO   INV-SW
+     ELSE
+         MOVE  PF07-KEY           TO   WK-ZAI-KEY
+     END-IF.
+     PERFORM            ZAIMS-START-SEC.
+     MOVE     SPACE               TO   BODYG.
+     MOVE     SPACE               TO   KAKUG.
+     MOVE     1                   TO   IX01.
+     IF       SOKCD               =   SPACE
+              PERFORM   TOTAL-SET-SEC
+     END-IF.
+     PERFORM       VARYING   IX01      FROM      IX01 BY   1
+                   UNTIL     IX01           >    6
+                   OR        INV-SW         =    1
+                   OR        E000-KEY  NOT  =    WK-ZAI-KEY(1:33)
+         PERFORM        BODY-SET-SEC
+         MOVE  WK-ZAI-KEY         TO   PF08-KEY
+         MOVE  ZAI-F01            TO   PF08-KEY(32:2)
+         PERFORM        ZAIMS-READ-SEC
+     END-PERFORM.
+     IF       INV-SW              =    0
+     AND      E000-KEY            =    WK-ZAI-KEY(1:33)
+         CONTINUE
+     ELSE
+         MOVE  WK-ZAI-KEY         TO   PF08-KEY
+     END-IF.
+ BEFORE-PAGE-EXIT.
+     EXIT.
+******************************************************************
+*             次頁処理
+******************************************************************
+ NEXT-PAGE-SEC          SECTION.
+     IF       PF08-KEY            =    HIGH-VALUE
+              MOVE  7             TO   ERR-NO
+                                  GO   TO   NEXT-PAGE-EXIT
+     END-IF.
+     MOVE     ZERO                TO   INV-SW.
+     MOVE     PF08-KEY            TO   WK-ZAI-KEY.
+     PERFORM            ZAIMS-START-SEC.
+     IF       INV-SW              =    0
+         PERFORM        ZAIMS-READ-SEC
+     END-IF.
+     IF       INV-SW              =    1
+              MOVE  7             TO   ERR-NO
+                                  GO   TO   NEXT-PAGE-EXIT
+     END-IF.
+     MOVE     WK-ZAI-KEY          TO   PF07-KEY.
+     MOVE     ZAI-F01             TO   PF07-KEY(32:2).
+     MOVE     SPACE               TO   BODYG.
+     MOVE     SPACE               TO   KAKUG.
+     MOVE     1                   TO   IX01.
+     IF       SOKCD               =   SPACE
+              PERFORM   TOTAL-SET-SEC
+     END-IF.
+     PERFORM       VARYING   IX01      FROM      IX01 BY   1
+                   UNTIL     IX01           >    6
+                   OR        INV-SW         =    1
+                   OR        E000-KEY  NOT  =    WK-ZAI-KEY(1:33)
+         PERFORM        BODY-SET-SEC
+         MOVE  WK-ZAI-KEY         TO   PF08-KEY
+         MOVE  ZAI-F01            TO   PF08-KEY(32:2)
+         PERFORM        ZAIMS-READ-SEC
+     END-PERFORM.
+     IF       INV-SW              =    0
+     AND      E000-KEY            =    WK-ZAI-KEY(1:33)
+         CONTINUE
+     ELSE
+         MOVE  HIGH-VALUE         TO   PF08-KEY
+     END-IF.
+ NEXT-PAGE-EXIT.
+     EXIT.
+******************************************************************
+*             合計計算処理
+******************************************************************
+ TOTAL-ADD-SEC          SECTION.
+     MOVE     ZERO                TO   TOTAL-AREA.
+     PERFORM       UNTIL     INV-SW         =    1
+                   OR        E000-KEY  NOT  =    WK-ZAI-KEY(1:33)
+         ADD   ZAI-F04            TO   TTL-F04
+         ADD   ZAI-F05            TO   TTL-F05
+         ADD   ZAI-F07            TO   TTL-F07
+         ADD   ZAI-F08            TO   TTL-F08
+         ADD   ZAI-F15            TO   TTL-F15
+         ADD   ZAI-F16            TO   TTL-F16
+         ADD   ZAI-F26            TO   TTL-F26
+         ADD   ZAI-F27            TO   TTL-F27
+         ADD   ZAI-F28            TO   TTL-F28
+         COMPUTE  TTL-F99 = TTL-F99 + ( ZAI-F04 - ZAI-F27 )
+         PERFORM        ZAIMS-READ-SEC
+     END-PERFORM.
+ TOTAL-ADD-EXIT.
+     EXIT.
+******************************************************************
+*             前レコード検索処理
+******************************************************************
+ BEFORE-REC-SEARCH      SECTION.
+     MOVE     E000-KEY            TO   WK-ZAI-KEY.
+     PERFORM            ZAIMS-START-RVS.
+     IF       INV-SW              =    0
+         PERFORM   UNTIL     INV-SW         =    1
+                   OR        E000-KEY  NOT  =    WK-ZAI-KEY(1:33)
+              PERFORM   ZAIMS-READ-SEC
+         END-PERFORM
+     END-IF.
+ BEFORE-REC-SEARCH-EXIT.
+     EXIT.
+******************************************************************
+*             次レコード検索処理
+******************************************************************
+ NEXT-REC-SEARCH        SECTION.
+     MOVE     E000-KEY            TO   WK-ZAI-KEY.
+     PERFORM            ZAIMS-START-SEC.
+     IF       INV-SW              =    0
+         PERFORM   UNTIL     INV-SW         =    1
+                   OR        E000-KEY  NOT  =    WK-ZAI-KEY(1:33)
+              PERFORM   ZAIMS-READ-SEC
+         END-PERFORM
+     END-IF.
+ NEXT-REC-SEARCH-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ位置付け（降順）
+******************************************************************
+ ZAIMS-START-RVS        SECTION.
+     IF       SYORI-FLG           =    1
+         PERFORM        ZAIMS2-START-RVS
+     ELSE
+         PERFORM        ZAIMS3-START-RVS
+     END-IF.
+ ZAIMS-START-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ位置付け（降順）
+******************************************************************
+ ZAIMS2-START-RVS       SECTION.
+     MOVE     WK-ZAI-KEY-SOKO-CD  TO   ZAI2-F01.
+     MOVE     WK-ZAI-KEY-SYO-CD   TO   ZAI2-F02.
+     MOVE     WK-ZAI-KEY-TANA-BN  TO   ZAI2-F03.
+     START    ZAMZAIL2       KEY  <=   ZAI2-F02
+                                       ZAI2-F01
+                                       ZAI2-F03
+                             WITH      REVERSED  ORDER
+         INVALID  KEY
+              MOVE  1             TO   INV-SW
+         NOT  INVALID   KEY
+              PERFORM        ZAIMS2-READ-SEC
+     END-START.
+ ZAIMS2-START-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ位置付け（降順）
+******************************************************************
+ ZAIMS3-START-RVS       SECTION.
+     MOVE     WK-ZAI-KEY-SOKO-CD  TO   ZAI3-F01.
+     MOVE     WK-ZAI-KEY-SYO-CD   TO   ZAI3-F02.
+     MOVE     WK-ZAI-KEY-TANA-BN  TO   ZAI3-F03.
+     MOVE     WK-ZAI-KEY-KANA-NM  TO   ZAI3-F30.
+     START    ZAMZAIL3       KEY  <=   ZAI3-F30
+                                       ZAI3-F02
+                                       ZAI3-F01
+                                       ZAI3-F03
+                             WITH      REVERSED  ORDER
+         INVALID  KEY
+              MOVE  1             TO   INV-SW
+         NOT  INVALID   KEY
+              PERFORM        ZAIMS3-READ-SEC
+     END-START.
+ ZAIMS3-START-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ位置付け（昇順）
+******************************************************************
+ ZAIMS-START-SEC        SECTION.
+     IF       SYORI-FLG           =    1
+         PERFORM        ZAIMS2-START-SEC
+     ELSE
+         PERFORM        ZAIMS3-START-SEC
+     END-IF.
+ ZAIMS-START-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ位置付け（昇順）
+******************************************************************
+ ZAIMS2-START-SEC       SECTION.
+     MOVE     WK-ZAI-KEY-SOKO-CD  TO   ZAI2-F01.
+     MOVE     WK-ZAI-KEY-SYO-CD   TO   ZAI2-F02.
+     MOVE     WK-ZAI-KEY-TANA-BN  TO   ZAI2-F03.
+     START    ZAMZAIL2       KEY  >=   ZAI2-F02
+                                       ZAI2-F01
+                                       ZAI2-F03
+         INVALID   KEY
+              MOVE  1             TO   INV-SW
+         NOT  INVALID   KEY
+              PERFORM        ZAIMS2-READ-SEC
+     END-START.
+ ZAIMS2-START-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ位置付け（昇順）
+******************************************************************
+ ZAIMS3-START-SEC       SECTION.
+     MOVE     WK-ZAI-KEY-SOKO-CD  TO   ZAI3-F01.
+     MOVE     WK-ZAI-KEY-SYO-CD   TO   ZAI3-F02.
+     MOVE     WK-ZAI-KEY-TANA-BN  TO   ZAI3-F03.
+     MOVE     WK-ZAI-KEY-KANA-NM  TO   ZAI3-F30.
+     START    ZAMZAIL3       KEY  >=   ZAI3-F30
+                                       ZAI3-F02
+                                       ZAI3-F01
+                                       ZAI3-F03
+         INVALID   KEY
+              MOVE  1             TO   INV-SW
+         NOT  INVALID   KEY
+              PERFORM        ZAIMS3-READ-SEC
+     END-START.
+ ZAIMS3-START-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ読込み
+******************************************************************
+ ZAIMS-READ-SEC         SECTION.
+     IF       SYORI-FLG           =    1
+         PERFORM        ZAIMS2-READ-SEC
+     ELSE
+         PERFORM        ZAIMS3-READ-SEC
+     END-IF.
+ ZAIMS-READ-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ読込み
+******************************************************************
+ ZAIMS2-READ-SEC        SECTION.
+     READ     ZAMZAIL2        NEXT
+         AT   END
+              MOVE  1             TO   INV-SW
+              GO    TO            ZAIMS2-READ-EXIT
+         NOT  AT   END
+              MOVE  SPACE         TO   WK-ZAI-KEY
+              IF   SOKCD     NOT  =   "  "
+                   IF   SOKCD     NOT  =    ZAI2-F01
+                                  GO   TO   ZAIMS2-READ-SEC
+                   END-IF
+                   MOVE  ZAI2-F01      TO   WK-ZAI-KEY-SOKO-CD
+              END-IF
+              MOVE  ZAI2-F01      TO   WK-ZAI-SOKO-CD
+              MOVE  ZAI2-F03      TO   WK-ZAI-TANA-BN
+              MOVE  ZAI2-F02      TO   WK-ZAI-KEY-SYO-CD
+              MOVE  ZAI2-F03      TO   WK-ZAI-KEY-TANA-BN
+              IF   SYORI-FLG      =    2
+                   MOVE  ZAI2-F30      TO   WK-ZAI-KEY-KANA-NM
+              END-IF
+              MOVE  ZAI2-REC      TO   ZAI-REC
+     END-READ.
+ ZAIMS2-READ-EXIT.
+     EXIT.
+******************************************************************
+*             商品在庫マスタ読込み
+******************************************************************
+ ZAIMS3-READ-SEC        SECTION.
+     READ     ZAMZAIL3        NEXT
+         AT   END
+              MOVE  1             TO   INV-SW
+              GO    TO            ZAIMS3-READ-EXIT
+         NOT  AT   END
+              MOVE  SPACE         TO   WK-ZAI-KEY
+              IF   SOKCD     NOT  =   "  "
+                   IF   SOKCD     NOT  =    ZAI3-F01
+                                  GO   TO   ZAIMS3-READ-SEC
+                   END-IF
+                   MOVE  ZAI3-F01      TO   WK-ZAI-KEY-SOKO-CD
+              END-IF
+              MOVE  ZAI3-F01      TO   WK-ZAI-SOKO-CD
+              MOVE  ZAI3-F03      TO   WK-ZAI-TANA-BN
+              MOVE  ZAI3-F02      TO   WK-ZAI-KEY-SYO-CD
+              MOVE  ZAI3-F03      TO   WK-ZAI-KEY-TANA-BN
+              IF   SYORI-FLG      =    2
+                   MOVE  ZAI3-F30      TO   WK-ZAI-KEY-KANA-NM
+              END-IF
+              MOVE  ZAI3-REC      TO   ZAI-REC
+     END-READ.
+ ZAIMS3-READ-EXIT.
+     EXIT.
+******************************************************************
+*             ヘッドセット処理
+******************************************************************
+ HEAD-SET-SEC           SECTION.
+     MOVE     ZAI-F02             TO   SHOCD.
+     MOVE     ZAI-F30             TO   KANANM.
+     PERFORM            MEIMS-READ-SEC.
+     MOVE    "HEAD"               TO   DSP-GRP.
+     PERFORM            DSP-WR-SEC.
+ HEAD-SET-EXIT.
+     EXIT.
+******************************************************************
+*             商品名称マスタ読込み
+******************************************************************
+ MEIMS-READ-SEC         SECTION.
+     MOVE     ZAI-F02             TO   MEI-F01.
+     READ     HMEIMS
+         INVALID
+              MOVE  ALL NC"＊"    TO   SHONM
+         NOT  INVALID
+              MOVE  MEI-F02       TO   WK-MEI-F02G
+              MOVE  WK-MEI-F02    TO   SHONM
+     END-READ.
+ MEIMS-READ-EXIT.
+     EXIT.
+******************************************************************
+*             ボディ部　セット処理（合計）
+******************************************************************
+ TOTAL-SET-SEC          SECTION.
+     MOVE     NC"合計"            TO   SOKO   (IX01).
+     MOVE     TTL-F04             TO   GEN    (IX01).
+     MOVE     TTL-F05             TO   ZEN    (IX01).
+     MOVE     TTL-F07             TO   TONYK  (IX01).
+     MOVE     TTL-F08             TO   TOSYK  (IX01).
+     MOVE     TTL-F26             TO   HACZAN (IX01).
+     MOVE     TTL-F27             TO   JYUZAN (IX01).
+*****MOVE     TTL-F15             TO   ZENNYK (IX01).
+*****MOVE     TTL-F16             TO   ZENSYK (IX01).
+     MOVE     TTL-F28             TO   HIKIAT (IX01).
+     MOVE     TTL-F99             TO   HIKIZA (IX01).
+     ADD      1                   TO           IX01 .
+ TOTAL-SET-EXIT.
+     EXIT.
+******************************************************************
+*             ボディ部　セット処理
+******************************************************************
+ BODY-SET-SEC           SECTION.
+     IF       SOKCD               =   SPACE
+              MOVE  ZAI-F01       TO   SOK-F01
+              READ      ZSOKMS
+                INVALID
+                   MOVE  SPACE    TO   SOKO   (IX01)
+                NOT  INVALID
+                   MOVE  SOK-F02  TO   SOKO   (IX01)
+              END-READ
+     ELSE
+              MOVE  SOKNM         TO   SOKO   (IX01)
+     END-IF.
+     MOVE     ZAI-F01             TO   SOKOM  (IX01).
+     MOVE     ZAI-F022 (1:5)      TO   HTAN1  (IX01).
+     MOVE     ZAI-F022 (6:2)      TO   HTAN2  (IX01).
+     MOVE     ZAI-F022 (8:1)      TO   HTAN3  (IX01).
+     IF       ZAI-F03      NOT =  SPACE
+              MOVE   ZAI-F03(1:1)      TO   WK-TANA1
+              MOVE   ZAI-F03(2:3)      TO   WK-TANA2
+              MOVE   ZAI-F03(5:2)      TO   WK-TANA3
+              MOVE   WK-TANA           TO   TANA (IX01)
+     ELSE
+              MOVE   SPACE             TO   TANA (IX01)
+     END-IF.
+     MOVE     ZAI-F04             TO   GEN    (IX01).
+     MOVE     ZAI-F05             TO   ZEN    (IX01).
+     MOVE     ZAI-F07             TO   TONYK  (IX01).
+     MOVE     ZAI-F08             TO   TOSYK  (IX01).
+     MOVE     ZAI-F26             TO   HACZAN (IX01).
+     MOVE     ZAI-F27             TO   JYUZAN (IX01).
+*****MOVE     ZAI-F15             TO   ZENNYK (IX01).
+*****MOVE     ZAI-F16             TO   ZENSYK (IX01).
+     MOVE     ZAI-F28             TO   HIKIAT (IX01).
+     COMPUTE HIKIZA(IX01) = ZAI-F04 - ZAI-F27.
+ BODY-SET-EXIT.
+     EXIT.
+****************************************************************
+*             ＰＦキーガイダンス
+****************************************************************
+ PFK-DSP-SEC            SECTION.
+     IF       SYORI-GROUP         =   "HEAD"
+         MOVE  PMSG01             TO   MO002
+     ELSE
+         MOVE  SPACE              TO   PMSG02R
+         MOVE  PMSG02             TO   PMSG02A
+         MOVE  1                  TO   IX01
+         IF   PF07-KEY       NOT  =    LOW-VALUE
+           MOVE  NC"_"           TO   PMSG02IX ( IX01     )
+           MOVE  NC"前"           TO   PMSG02IX ( IX01 + 1 )
+           MOVE  NC"頁"           TO   PMSG02IX ( IX01 + 2 )
+           ADD   4                TO   IX01
+         END-IF
+         IF   PF08-KEY       NOT  =    HIGH-VALUE
+           MOVE  NC"_"           TO   PMSG02IX ( IX01     )
+           MOVE  NC"次"           TO   PMSG02IX ( IX01 + 1 )
+           MOVE  NC"頁"           TO   PMSG02IX ( IX01 + 2 )
+           ADD   4                TO   IX01
+         END-IF
+         IF   PF11-KEY       NOT  =    LOW-VALUE
+           MOVE  NC"_"           TO   PMSG02IX ( IX01     )
+           MOVE  NC"前"           TO   PMSG02IX ( IX01 + 1 )
+           MOVE  NC"レ"           TO   PMSG02IX ( IX01 + 2 )
+           MOVE  NC"コ"           TO   PMSG02IX ( IX01 + 3 )
+           MOVE  NC"ー"           TO   PMSG02IX ( IX01 + 4 )
+           MOVE  NC"ド"           TO   PMSG02IX ( IX01 + 5 )
+           ADD   7                     TO   IX01
+         END-IF
+         IF   PF12-KEY       NOT  =    HIGH-VALUE
+           MOVE  NC"_"           TO   PMSG02IX ( IX01     )
+           MOVE  NC"次"           TO   PMSG02IX ( IX01 + 1 )
+           MOVE  NC"レ"           TO   PMSG02IX ( IX01 + 2 )
+           MOVE  NC"コ"           TO   PMSG02IX ( IX01 + 3 )
+           MOVE  NC"ー"           TO   PMSG02IX ( IX01 + 4 )
+           MOVE  NC"ド"           TO   PMSG02IX ( IX01 + 5 )
+         END-IF
+         MOVE  PMSG02R            TO   MO002
+     END-IF.
+     MOVE    "MO002"                   TO   DSP-GRP.
+     PERFORM            DSP-WR-SEC.
+ PFK-DSP-EXIT.
+     EXIT.
+****************************************************************
+*             エラー処理
+****************************************************************
+ ERR-DSP-SEC            SECTION.
+     IF       ERR-NO              =    ZERO
+              MOVE  SPACE              TO   MO001
+     ELSE
+              MOVE  MSGIX (ERR-NO)     TO   MO001
+     END-IF.
+     MOVE    "MO001"                   TO   DSP-GRP.
+     PERFORM            DSP-WR-SEC.
+ ERR-DSP-EXIT.
+     EXIT.
+******************************************************************
+*             終了処理
+******************************************************************
+ END-SEC                SECTION.
+     CLOSE         ZAMZAIL2
+                   ZAMZAIL3
+                   HMEIMS
+                   HJYOKEN
+                   ZSOKMS
+                   DSPFILE.
+ END-EXIT.
+     EXIT.
+****************************************************************
+*             画面　　ＲＥＡＤ
+****************************************************************
+ DSP-RD-SEC             SECTION.
+     MOVE    "NE"                 TO   DSP-PRO.
+     READ     DSPFILE.
+ DSP-RD-EXIT.
+     EXIT.
+****************************************************************
+*             画面    ＷＲＩＴＥ
+****************************************************************
+ DSP-WR-SEC             SECTION.
+     MOVE     SPACE               TO   DSP-PRO.
+     WRITE    FJZ00411.
+ DSP-WR-EXIT.
+     EXIT.
+****************************************************************
+*             明細部チェック                          2.4.1    *
+****************************************************************
+ MEISAI-CHK-SEC           SECTION.
+*
+*    MOVE     "MEISAI-CHK-SEC"   TO   S-NAME.
+*照会パターンチェック
+     IF      R001 =  ZERO
+     OR      R001 NOT NUMERIC
+         MOVE   SPACE   TO      R001
+     END-IF.
+*
+     IF      R001   =  1 OR 2 OR 3
+         MOVE  "M"      TO  EDIT-OPTION  OF      R001
+         MOVE   SPACE   TO  EDIT-CURSOR  OF      R001
+     ELSE
+         MOVE   12      TO  ERR-NO
+         MOVE  "R"      TO  EDIT-OPTION  OF      R001
+         MOVE  "C"      TO  EDIT-CURSOR  OF      R001
+         GO              TO     MEISAI-CHK-EXIT
+     END-IF.
+*明細番号チェック
+     IF      GYO  =  ZERO
+     OR      GYO  NOT NUMERIC
+         MOVE   ZERO    TO      GYO
+     END-IF.
+*
+     IF      SOKCD   =   SPACE
+         IF      GYO    =  2 OR 3 OR 4 OR 5 OR 6
+             MOVE  "M"      TO  EDIT-OPTION  OF      GYO
+             MOVE   SPACE   TO  EDIT-CURSOR  OF      GYO
+         ELSE
+             MOVE   13      TO  ERR-NO
+             MOVE  "R"      TO  EDIT-OPTION  OF      GYO
+             MOVE  "C"      TO  EDIT-CURSOR  OF      GYO
+             GO              TO     MEISAI-CHK-EXIT
+         END-IF
+     END-IF.
+     IF      SOKCD   NOT =   SPACE
+         IF      GYO    =  1 OR 2 OR 3 OR 4 OR 5 OR 6
+             MOVE  "M"      TO  EDIT-OPTION  OF      GYO
+             MOVE   SPACE   TO  EDIT-CURSOR  OF      GYO
+         ELSE
+             MOVE   13      TO  ERR-NO
+             MOVE  "R"      TO  EDIT-OPTION  OF      GYO
+             MOVE  "C"      TO  EDIT-CURSOR  OF      GYO
+             GO              TO     MEISAI-CHK-EXIT
+         END-IF
+     END-IF.
+     IF  SOKOM(GYO) NOT = SPACE
+         MOVE  "M"      TO  EDIT-OPTION  OF      GYO
+         MOVE   SPACE   TO  EDIT-CURSOR  OF      GYO
+     ELSE
+         MOVE   14      TO  ERR-NO
+         MOVE  "R"      TO  EDIT-OPTION  OF      GYO
+         MOVE  "C"      TO  EDIT-CURSOR  OF      GYO
+         GO              TO     MEISAI-CHK-EXIT
+     END-IF.
+*
+     IF   ERR-NO   NOT =  ZERO
+          GO              TO     MEISAI-CHK-EXIT
+     END-IF.
+*
+     MOVE  SPACE          TO     PA-MEISAI.
+     INITIALIZE                  PA-MEISAI.
+     MOVE      SOKOM(    GYO)              TO     PA-SOKCD.
+     MOVE      SPACE                       TO     PA-DSOKCD.
+     MOVE      SHOCD                       TO     PA-SHOCD.
+     MOVE      HTAN1(    GYO)              TO     PA-HINCD1.
+     MOVE      HTAN2(    GYO)              TO     PA-HINCD2.
+     MOVE      HTAN3(    GYO)              TO     PA-HINCD3.
+     MOVE      TANA (    GYO)(1:1)         TO     PA-TANA(1:1).
+     MOVE      TANA (    GYO)(3:3)         TO     PA-TANA(2:3).
+     MOVE      TANA (    GYO)(7:2)         TO     PA-TANA(5:2).
+*#2018/04/27 NAV ST
+     MOVE      ZERO                        TO     PA-NDATE.
+*#2018/04/27 NAV ED
+*
+     IF      R001   =  1
+         CALL "SJZ0010I"  USING                   PA-SOKCD
+                                                  PA-DSOKCD
+                                                  PA-SHOCD
+                                                  PA-HINCD1
+                                                  PA-HINCD2
+                                                  PA-HINCD3
+                                                  PA-TANA
+     END-IF.
+     IF  R001   =  2
+         CALL "SJZ0020I"  USING                   PA-SOKCD
+                                                  PA-DSOKCD
+                                                  PA-SHOCD
+                                                  PA-HINCD1
+                                                  PA-HINCD2
+                                                  PA-HINCD3
+                                                  PA-TANA
+     END-IF.
+     IF      R001   =  3
+         CALL "SJZ0030I"  USING                   PA-SOKCD
+                                                  PA-DSOKCD
+                                                  PA-SHOCD
+                                                  PA-HINCD1
+                                                  PA-HINCD2
+                                                  PA-HINCD3
+                                                  PA-TOKCD
+                                                  PA-TANA
+*#2018/04/27 NAV ST
+                                                  PA-NDATE
+*#2018/04/27 NAV ED
+     END-IF.
+*
+     MOVE  SPACE   TO      KAKUG.
+*全画面クリア（呼んだPGの画面表示をクリアする)
+     MOVE  "CL"           TO  DSP-PRO.
+     MOVE  "SCREEN"       TO  DSP-GRP.
+     MOVE  "FJZ00411"     TO  DSP-FMT.
+     WRITE  FJZ00411.
+*通常出力指定に戻す。
+     MOVE  SPACE          TO  DSP-PRO.
+*
+ MEISAI-CHK-EXIT.
+     EXIT.
+

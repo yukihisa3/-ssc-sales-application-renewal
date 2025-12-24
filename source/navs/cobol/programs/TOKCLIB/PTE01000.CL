@@ -1,0 +1,271 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    出荷管理（手書伝票データ用）         *  ./
+/. *   JOB-ID      :    PTE00100                             *  ./
+/. *   JOB-NAME    :    手書伝票用発注集計表                 *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?FILNM    ,STRING*8,VALUE-'        '
+    VAR ?FILNMH   ,STRING*5,VALUE-'JHTTE'
+    VAR ?FILNMW   ,STRING*6,VALUE-'TEGHAC'
+    VAR ?LIBNM    ,STRING*8,VALUE-'TOKFLIB '
+    VAR ?KEYNO    ,STRING*1,VALUE-'1'
+    VAR ?FILID    ,NAME
+    VAR ?LIBID    ,NAME
+    VAR ?JHTDENF  ,NAME!MOD
+    VAR ?JHTDENFN ,STRING*17
+    VAR ?TEGHACF  ,NAME!MOD
+    VAR ?TEGHACFN ,STRING*17
+    VAR ?PGMEC    ,INTEGER
+    VAR ?PGMECX   ,STRING*11
+    VAR ?PGMEM    ,STRING*99
+    VAR ?MSG      ,STRING*99(6)
+    VAR ?MSGX     ,STRING*99
+    VAR ?PGMID    ,STRING*8,VALUE-'PTE00100'
+    VAR ?STEP     ,STRING*8
+    VAR ?WKSTN    ,NAME
+    VAR ?WS       ,STRING*8,VALUE-'        '
+    VAR ?SOKCD    ,STRING*2,VALUE-'00'
+    VAR ?DSOKCD   ,STRING*2,VALUE-'00'
+    VAR ?TORICD   ,STRING*8,VALUE-'00000000'  /.取引先./
+    VAR ?SDEN     ,STRING*9,VALUE-'000000000' /.伝票開始./
+    VAR ?EDEN     ,STRING*9,VALUE-'000000000' /.伝票終了./
+    VAR ?KBN      ,STRING*1,VALUE-'0'         /.出力区分./
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DEFLIBL   TOKELIB
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?SOKCD,?DSOKCD)
+    IF        @PGMEC ^= 0 THEN
+              GOTO ABEND
+    END
+/.##実行場所ﾁｪｯｸ##./
+    IF   ?DSOKCD ^=  '01'  THEN
+          GOTO        FILNMCHG
+    END
+
+/.##倉庫ｺｰﾄﾞ選択##./
+SKY1701I:
+
+    ?STEP :=   'SKY1701I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DEFLIBL   TOKELIB
+
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    OVRDSPF   FILE-PRTF,TOFILE-PRTF.XUCL,MEDLIB-TOKELIB
+    CALL      PGM-SKY1701I.TOKELIB,PARA-(?SOKCD)
+    IF        @PGMEC    ^=   0    THEN
+              ?PGMEC := @PGMEC
+              IF    ?PGMEC  =  4010
+                 THEN
+                    ?MSGX := '##取消終了##'
+                    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+                    RETURN PGMEC-@PGMEC
+                 ELSE
+                    GOTO   ABEND
+                 END
+    END
+
+/.##ﾌｧｲﾙ名称取得##./
+FILNMCHG:
+
+    ?MSGX := '## 実行倉庫ｺｰﾄﾞ = ' && ?SOKCD && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?FILNMH && ?SOKCD && ?KEYNO
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?JHTDENF  :=    %NCAT(?FILID,?LIBID)
+    ?JHTDENFN :=    %STRING(?JHTDENF)
+    ?MSGX     :=    '## 倉庫ﾌｧｲﾙ名 = ' && ?JHTDENFN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?FILNMW && ?SOKCD
+    ?FILID    :=    %NAME(?FILNM)
+    ?LIBID    :=    %NAME(?LIBNM)
+    ?TEGHACF  :=    %NCAT(?FILID,?LIBID)
+    ?TEGHACFN :=    %STRING(?TEGHACF)
+    ?MSGX     :=    '## 発注集計ﾌｧｲﾙ名 = ' && ?TEGHACFN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+
+/.##発注集計表発行指示入力##./
+STE0100I:
+
+    ?STEP :=   'STE0100I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-JHTDENF,TOFILE-?JHTDENF
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    CALL      PGM-STE0100I.TOKELIB,PARA-(?SOKCD,?TORICD,?SDEN,?EDEN,
+                                          ?KBN)
+    IF        @PGMEC    ^=   0    THEN
+        IF    @PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO   RTN2
+        ELSE
+              GOTO   ABEND
+        END
+    END
+
+    ?MSGX := '## TORICD = ' && ?TORICD && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF
+
+/.##発注集計表データ抽出##./
+STE0110B:
+
+    ?STEP :=   'STE0110B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    DEFLIBL   TOKELIB/TOKFLIB
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-JHTDENF,TOFILE-?JHTDENF
+    OVRF      FILE-SHWHACF,TOFILE-?TEGHACF
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-HSHOTBL,TOFILE-SHOTBL2.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    CALL      PGM-STE0110B.TOKELIB,PARA-(?SOKCD,?TORICD,?SDEN,?EDEN)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO   ABEND
+    END
+/.##出力順毎ＰＧ振分##./
+                                  /.##相手商品##./
+    IF        ?KBN       =  '2'   THEN
+              GOTO AITESCD
+    END
+                                  /.##_番順##./
+    IF        ?KBN       =  '3'   THEN
+              GOTO TANABAN
+    END
+
+/.##ＳＯＲＴ　サカタ商品コード順##./
+SORT1:
+/.##ＳＯＲＴ順：部門、倉庫、納品日、商品ｺｰﾄﾞ、店舗順##./
+    ?STEP :=  'SORT1   '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    SORT       INFILE-?TEGHACF,INRL-200,INBF-5,
+              OUTFILE-?TEGHACF,OUTBF-5,
+              KEY-28!4!CA,KEY1-26!2!CA,KEY2-40!8!CA,KEY3-61!16!CA,
+              KEY4-21!5!CA,
+              RCDL-@DSP
+
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND
+    ELSE
+              GOTO STE0120L
+    END
+
+/.##相手商品ｺｰﾄﾞ順#./
+AITESCD:
+/.##ＳＯＲＴ　相手商品コード##./
+SORT2:
+/.##ＳＯＲＴ順：部門、倉庫、納品日、相手商品ｺｰﾄﾞ、店舗順##./
+    ?STEP :=  'SORT2   '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    SORT       INFILE-?TEGHACF,INRL-200,INBF-5,
+              OUTFILE-?TEGHACF,OUTBF-5,
+              KEY-28!4!CA,KEY1-26!2!CA,KEY2-40!8!CA,KEY3-48!13!CA,
+              KEY4-21!5!CA,
+              RCDL-@DSP
+
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+
+/.##発注集計表作表（自社商品順／相手商品順）##./
+STE0120L:
+
+    ?STEP :=   'STE0120L'
+      ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+
+    OVRF      FILE-TEGHACF,TOFILE-?TEGHACF
+    CALL      PGM-STE0120L.TOKELIB,PARA-(?KBN)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN1:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+/.##_番＋商品コード順##./
+TANABAN:
+/.##ＳＯＲＴ：部門、倉庫、納品日、_番、相手商品、店舗##./
+SORT3:
+
+    ?STEP :=  'SORT3   '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    SORT      INFILE-?TEGHACF,INRL-200,INBF-5,
+              OUTFILE-?TEGHACF,OUTBF-5,
+              KEY-28!4!CA,KEY1-26!2!CA,KEY2-40!8!CA,KEY3-77!6!CA,
+/.            KEY4-48!13!CA,KEY5-21!5!CA,  ./
+              KEY4-61!16!CA,KEY5-21!5!CA,
+              RCDL-@DSP
+
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+/.##発注集計表作表（_番＋商品コード順）##./
+STE0130L:
+
+    ?STEP :=   'STE0130L'
+      ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+
+    OVRF      FILE-SHWHACF,TOFILE-?TEGHACF
+    CALL      PGM-STE0130L.TOKELIB,PARA-(?KBN)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN2:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    END
+
+    RETURN    PGMEC-@PGMEC
+

@@ -1,0 +1,169 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    トステムビバオンラインシステム　　　 *  ./
+/. *   JOB-ID      :    PSE50040                             *  ./
+/. *   JOB-NAME    :    配信ファイル作成（トステムビバ）　　 *  ./
+/. ***********************************************************  ./
+    PGM
+    VAR       ?PGMEC    ,INTEGER
+    VAR       ?PGMECX   ,STRING*11
+    VAR       ?PGMEM    ,STRING*99
+    VAR       ?MSG      ,STRING*99(6)
+    VAR       ?MSGX     ,STRING*99
+    VAR       ?PGMID    ,STRING*8,VALUE-'PSE50040'
+    VAR       ?STEP     ,STRING*8
+    VAR       ?JBNM     ,STRING*24!MIXED            /.業務漢字名 ./
+    VAR       ?JBID     ,STRING*10                  /.業務ＩＤ   ./
+    VAR       ?PGID     ,STRING*10                  /.ＰＧＩＤ　 ./
+/.-----------------------------------------------------------./
+    VAR       ?CLID     ,STRING*8                   /.ＣＬＩＤ   ./
+    VAR       ?MSG1     ,STRING*80                  /.開始終了MSG./
+    VAR       ?OPR1     ,STRING*50                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?OPR2     ,STRING*50                  /.      2    ./
+    VAR       ?OPR3     ,STRING*50                  /.      3    ./
+    VAR       ?OPR4     ,STRING*50                  /.      4    ./
+    VAR       ?OPR5     ,STRING*50                  /.      5    ./
+/.-----------------------------------------------------------./
+    VAR       ?PGNM     ,STRING*40                  /.ﾒｯｾｰｼﾞ1    ./
+    VAR       ?KEKA1    ,STRING*40                  /.      2    ./
+    VAR       ?KEKA2    ,STRING*40                  /.      3    ./
+    VAR       ?KEKA3    ,STRING*40                  /.      4    ./
+    VAR       ?KEKA4    ,STRING*40                  /.      5    ./
+    VAR       ?SYORINM1 ,STRING*40
+    VAR       ?SYORINM2 ,STRING*50
+    VAR       ?SYORINM3 ,STRING*50
+    VAR       ?SYORIKN1 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN2 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN3 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN4 ,STRING*7,VALUE-'0000000'
+    VAR       ?SYORIKN5 ,STRING*7,VALUE-'0000000'
+
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL TOKELIB/TOKFLIB
+
+/.##ﾌﾟﾛｸﾞﾗﾑ名称ｾｯﾄ##./
+    ?PGNM :=  'トステムビバ　請求送信　前処理'
+    ?SYORINM1 :=  'トステムビバ　請求送信　前処理'
+
+/.##トステムビバ請求送信データ作成確認##./
+STEP00:
+    ?JBID    :=   'PSE50040'
+    ?CLID    :=   'PSE50040'
+    ?MSG1    := '<<< ' && ?CLID && ' START '
+               && %SBSTR(@SDATEY,1,2) && '/'
+               && %SBSTR(@SDATEY,3,2) && '/'
+               && %SBSTR(@SDATEY,5,2) && ' '
+               && %SBSTR(@STIME,1,2)  && ':'
+               && %SBSTR(@STIME,3,2)  && ':'
+               && %SBSTR(@STIME,5,2)  && ' >>>'
+     SNDMSG  MSG-?MSG1,TOWS-@ORGWS,JLOG-@YES
+
+    ?OPR1  :=  '　トステムビバ殿　請求データの作成を行います。'
+    ?OPR2  :=  '　確認して下さい。'
+    ?OPR3  :=  '　また，作成完了後，ＰＣより請求送信を処理を'
+    ?OPR4  :=  '　行なって下さい。'
+    ?OPR5  :=  ''
+    CALL      OHOM0900.TOKELIB,PARA-
+                            (?OPR1,?OPR2,?OPR3,?OPR4,?OPR5)
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+ /.##トステムビバ請求データを、個別ファイルへ抽出する。##./
+PSORT:
+
+    ?STEP :=   'PSORT   '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    SORTF     INFILE-SETGKFA.TOKFLIB,
+              OUTFILE-SEIGK50.TOKFLIB,
+              KEY-'F01!A',
+              SELECT-'F01!EQ!#00038709',
+              SELECT1-'F01!EQ!#00387091',
+              RCDL-@DSP
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【トステムビバ　請求ＤＴ抽出】'
+              GOTO ABEND END
+
+/.##配信ファイル作成##./
+SSE5001B:
+
+    ?STEP :=   'SSE5001B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-SETGKFA2,TOFILE-SEIGK502.TOKFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-CVCSF,TOFILE-SEIWK.TOKFLIB
+    OVRF      FILE-JYOKEN2,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SSE5004B.TOKELIBO,PARA-(?SYORIKN1)
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【送信ＤＴ作成】'
+              GOTO ABEND END
+
+/.##配信ファイルにセット##./
+PCOPY:
+
+    ?STEP :=   'PCOPY   '
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    CNVFILE FILE-SEIWK.TOKFLIB,TOFILE-TOSTEMSE.ONLBLIB,
+            ADD-@NO,BF-1
+    IF        @PGMEC    ^=   0    THEN
+              ?KEKA4 :=  '【配信ファイルセット】'
+              GOTO ABEND END
+
+
+RTN:
+
+    ?KEKA1 :=  '処理が正常終了しました。'
+    ?KEKA2 :=  'ＰＣ端末より、請求データの送信を行なって'
+    ?KEKA3 :=  '下さい。'
+    ?KEKA4 :=  ''
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('1',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    DEFLIBL TOKELIBO/TOKELIB/TOKFLIB
+    OVRPRTF FILE-PRTF,TOFILE-PRTF.TOKELIB,MEDLIB-TOKELIBO
+                /.１２３４５６７８９０１２３４５６７８９０１２３４'./
+    ?SYORINM2 := 'トステムビバ請求送信前処理が正常終了しました。　'
+    ?SYORINM3 := '件数を確認して下さい。　　　　　　　　　　　　　'
+    CALL SSN0050L.TOKELIBO,
+          PARA-(?SYORINM1,?SYORINM2,?SYORINM3,?SYORIKN1,?SYORIKN2,
+                ?SYORIKN3,?SYORIKN4,?SYORIKN5)
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+ABEND:
+
+    ?KEKA1 :=  '処理が異常終了しました。'
+    ?KEKA2 :=  'この画面を印刷し、ＮＡＶへ連絡して下さい。'
+    ?KEKA3 :=  '現状、送信処理は中止して下さい。'
+    CALL SMG0030I.TOKELIB
+                    ,PARA-('2',?PGNM,?KEKA1,?KEKA2,?KEKA3,?KEKA4)
+    DEFLIBL TOKELIBO/TOKELIB/TOKFLIB
+    OVRPRTF FILE-PRTF,TOFILE-PRTF.TOKELIB,MEDLIB-TOKELIBO
+                /.１２３４５６７８９０１２３４５６７８９０１２３４'./
+    ?SYORINM2 := 'トステムビバ請求送信前処理が異常終了しました。　'
+    ?SYORINM3 := 'ログを採取して、ＮＡＶへ連絡して下さい。　　　　'
+    CALL SSN0050L.TOKELIBO,
+          PARA-(?SYORINM1,?SYORINM2,?SYORINM3,?SYORIKN1,?SYORIKN2,
+                ?SYORIKN3,?SYORIKN4,?SYORIKN5)
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=   '### ' && ?PGMID && ' ABEND' &&   '    ###'
+    ?MSG(2)   :=   '###' && ' PGMEC = ' &&
+                    %SBSTR(?PGMECX,8,4) &&         '      ###'
+    ?MSG(3)   :=   '###' && ' STEP = '  && ?STEP
+                                                   && '   ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+

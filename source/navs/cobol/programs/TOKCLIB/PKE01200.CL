@@ -1,0 +1,176 @@
+/. ***********************************************************  ./
+/. *     サカタのタネ　特販システム（本社システム）          *  ./
+/. *   SYSTEM-NAME :    出荷検品システム                     *  ./
+/. *   JOB-ID      :    PKE01200                             *  ./
+/. *   JOB-NAME    :    （出荷検品）手書データ抽出           *  ./
+/. ***********************************************************  ./
+    PGM
+/.###ﾜｰｸｴﾘｱ定義####./
+    VAR ?FILNM    ,STRING*8,VALUE-'        '    /.ﾌｧｲﾙ名合併用./
+    VAR ?FILNMH   ,STRING*6,VALUE-'TEGDEN'      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILNMK   ,STRING*6,VALUE-'TEGDEK'      /.ﾌｧｲﾙ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?LIBNM    ,STRING*8,VALUE-'TOKFLIB '    /.ﾗｲﾌﾞﾗﾘ名ﾃﾞﾌｫﾙﾄ./
+    VAR ?FILID    ,NAME                         /.ﾌｧｲﾙ名名前型./
+    VAR ?LIBID    ,NAME                         /.ﾗｲﾌﾞﾗﾘ名名前型./
+    VAR ?TEGDENF  ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?TEGDENFN ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?TEGDEKF  ,NAME!MOD                     /.ﾌｧｲﾙ.ﾗｲﾌﾞﾗﾘ./
+    VAR ?TEGDEKFN ,STRING*17                    /.ﾌｧｲﾙ名表示用./
+    VAR ?WS       ,STRING*8,VALUE-'        '    /.ﾜｰｸｽﾃｰｼｮﾝ文字./
+    VAR ?WKSTN    ,NAME!MOD                     /.ﾜｰｸｽﾃｰｼｮﾝ名前./
+    VAR ?PGMEC    ,INTEGER                      /.ﾌﾟﾛｸﾞﾗﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMECX   ,STRING*11                    /.ｼｽﾃﾑｴﾗｰｺｰﾄﾞ./
+    VAR ?PGMEM    ,STRING*99                    /.ｼｽﾃﾑｴﾗｰﾒｯｾｰｼﾞ./
+    VAR ?MSG      ,STRING*99(6)                 /.ﾒｯｾｰｼﾞ格納ﾃｰﾌﾞﾙ./
+    VAR ?MSGX     ,STRING*99                    /.SNDMSG表示用./
+    VAR ?PGMID    ,STRING*8,VALUE-'PSY00130'    /.ﾌﾟﾛｸﾞﾗﾑID./
+    VAR ?STEP     ,STRING*8                     /.STEP-ID./
+    VAR ?P1       ,STRING*8,VALUE-'00000000'    /.取引先./
+    VAR ?P2       ,STRING*9,VALUE-'000000000'   /.開始伝票./
+    VAR ?P3       ,STRING*9,VALUE-'000000000'   /.終了伝票./
+    VAR ?P4       ,STRING*2,VALUE-'00'          /.倉庫(自)./
+    VAR ?P5       ,STRING*2,VALUE-'00'          /.倉庫(代表)./
+/.##ﾌﾟﾛｸﾞﾗﾑ開始ﾒｯｾｰｼﾞ##./
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' START  ***'
+    SNDMSG    ?MSGX,TO-XCTL
+/.## ﾜｰｸｽﾃｰｼｮﾝ名取得##./
+    ?WKSTN   :=  @ORGWS
+    ?WS      :=  %STRING(?WKSTN)
+    ?MSGX    :=  '## ﾜｰｸｽﾃｰｼｮﾝ名 = ' && ?WS
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+/.##ﾗｲﾌﾞﾗﾘﾘｽﾄ登録##./
+    DEFLIBL   TOKELIB/TOKFLIB
+/.##倉庫ｺｰﾄﾞ取得##./
+SKY1601B:
+
+    ?STEP :=   'SKY1601B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    CALL      PGM-SKY1601B.TOKELIB,PARA-(?WS,?P4,?P5)
+    IF        @PGMEC    ^=   0   THEN
+              GOTO ABEND
+    END
+
+/.##オンラインデータ抽出指示入力##./
+SKE0100I:
+
+    ?STEP :=   'SKE0100I'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    OVRDSPF   FILE-DSPF,TOFILE-DSPF.XUCL,MEDLIB-TOKELIB
+    OVRF      FILE-SHTDENLA,TOFILE-SHTDENLA.TOKFLIB
+    OVRF      FILE-TOKMS2,TOFILE-TOKMS2.TOKFLIB
+    OVRF      FILE-ZSOKMS1,TOFILE-ZSOKMS1.TOKFLIB
+    CALL      PGM-SKE0120I.TOKELIB,PARA-(?P4,?P1,?P2,?P3,?P5)
+    IF        @PGMEC    ^=   0    THEN
+         IF   @PGMEC     =   4010 THEN
+              SNDMSG MSG-'##取消終了##',TO-XCTL.@ORGPROF,JLOG-@YES
+              GOTO RTN
+         ELSE
+              GOTO ABEND
+         END
+    END
+
+/.##ﾌｧｲﾙ名称取得##./
+FILNMCHG:
+
+    ?MSGX := '## 実行倉庫ｺｰﾄﾞ = ' && ?P4 && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?FILNMH && ?P4        /.ﾃﾞﾌｫﾙﾄﾌｧｲﾙ名+倉庫CD./
+    ?FILID    :=    %NAME(?FILNM)         /.ﾌｧｲﾙ名名前型変換   ./
+    ?LIBID    :=    %NAME(?LIBNM)         /.ﾗｲﾌﾞﾗﾘ名名前型変換 ./
+    ?TEGDENF  :=    %NCAT(?FILID,?LIBID)  /.ﾌｧｲﾙ名.ﾗｲﾌﾞﾗﾘ名    ./
+    ?TEGDENFN :=    %STRING(?TEGDENF)
+    ?MSGX     :=    '## 倉庫ﾌｧｲﾙ名 = ' && ?TEGDENFN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+    ?FILNM    :=    ?FILNMK && ?P4        /.ﾃﾞﾌｫﾙﾄﾌｧｲﾙ名+倉庫CD./
+    ?FILID    :=    %NAME(?FILNM)         /.ﾌｧｲﾙ名名前型変換   ./
+    ?LIBID    :=    %NAME(?LIBNM)         /.ﾗｲﾌﾞﾗﾘ名名前型変換 ./
+    ?TEGDEKF  :=    %NCAT(?FILID,?LIBID)  /.ﾌｧｲﾙ名.ﾗｲﾌﾞﾗﾘ名    ./
+    ?TEGDEKFN :=    %STRING(?TEGDEKF)
+    ?MSGX     :=    '## 件数ﾌｧｲﾙ名 = ' && ?TEGDEKFN && ' ##'
+    SNDMSG MSG-?MSGX,TO-XCTL.@ORGPROF,JLOG-@YES
+
+/.##手書データ抽出（全件数）##./
+SKE0130B:
+
+    ?STEP :=   'SKE0130B'
+    ?MSGX :=  '***   '  && ?STEP   &&   '        ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    DEFLIBL   TOKELIB
+
+    OVRF      FILE-SHTDENL6,TOFILE-SHTDENL6.TOKFLIB
+    OVRF      FILE-JYOKEN1,TOFILE-JYOKEN1.TOKFLIB
+    OVRF      FILE-SHOTBL1,TOFILE-SHOTBL1.TOKFLIB
+    OVRF      FILE-TEGDEN01,TOFILE-TEGDEN01.TOKFLIB
+    OVRF      FILE-TEGDEN02,TOFILE-TEGDEN62.TOKFLIB
+    OVRF      FILE-TEGDEN03,TOFILE-TEGDEN63.TOKFLIB
+    OVRF      FILE-TEGDEN04,TOFILE-TEGDEN04.TOKFLIB
+    OVRF      FILE-TEGDEN05,TOFILE-TEGDEN05.TOKFLIB
+    OVRF      FILE-TEGDEN06,TOFILE-TEGDEN06.TOKFLIB
+    OVRF      FILE-TEGDEN07,TOFILE-TEGDEN07.TOKFLIB
+    OVRF      FILE-TEGDEN08,TOFILE-TEGDEN08.TOKFLIB
+    OVRF      FILE-TEGDEN09,TOFILE-TEGDEN09.TOKFLIB
+    OVRF      FILE-TEGDEN10,TOFILE-TEGDEN10.TOKFLIB
+    OVRF      FILE-TEGDEN11,TOFILE-TEGDEN11.TOKFLIB
+    OVRF      FILE-TEGDEN12,TOFILE-TEGDEN12.TOKFLIB
+    OVRF      FILE-TEGDEN13,TOFILE-TEGDEN13.TOKFLIB
+    OVRF      FILE-TEGDEN14,TOFILE-TEGDEN14.TOKFLIB
+    OVRF      FILE-TEGDEN15,TOFILE-TEGDEN15.TOKFLIB
+    OVRF      FILE-TEGDEN16,TOFILE-TEGDEN16.TOKFLIB
+    OVRF      FILE-TEGDEN17,TOFILE-TEGDEN17.TOKFLIB
+    OVRF      FILE-TEGDEN18,TOFILE-TEGDEN18.TOKFLIB
+    OVRF      FILE-TEGDEN19,TOFILE-TEGDEN19.TOKFLIB
+    OVRF      FILE-TEGDEN20,TOFILE-TEGDEN20.TOKFLIB
+    OVRF      FILE-TEGDEK01,TOFILE-TEGDEK01.TOKFLIB
+    OVRF      FILE-TEGDEK02,TOFILE-TEGDEK62.TOKFLIB
+    OVRF      FILE-TEGDEK03,TOFILE-TEGDEK63.TOKFLIB
+    OVRF      FILE-TEGDEK04,TOFILE-TEGDEK04.TOKFLIB
+    OVRF      FILE-TEGDEK05,TOFILE-TEGDEK05.TOKFLIB
+    OVRF      FILE-TEGDEK06,TOFILE-TEGDEK06.TOKFLIB
+    OVRF      FILE-TEGDEK07,TOFILE-TEGDEK07.TOKFLIB
+    OVRF      FILE-TEGDEK08,TOFILE-TEGDEK08.TOKFLIB
+    OVRF      FILE-TEGDEK09,TOFILE-TEGDEK09.TOKFLIB
+    OVRF      FILE-TEGDEK10,TOFILE-TEGDEK10.TOKFLIB
+    OVRF      FILE-TEGDEK11,TOFILE-TEGDEK11.TOKFLIB
+    OVRF      FILE-TEGDEK12,TOFILE-TEGDEK12.TOKFLIB
+    OVRF      FILE-TEGDEK13,TOFILE-TEGDEK13.TOKFLIB
+    OVRF      FILE-TEGDEK14,TOFILE-TEGDEK14.TOKFLIB
+    OVRF      FILE-TEGDEK15,TOFILE-TEGDEK15.TOKFLIB
+    OVRF      FILE-TEGDEK16,TOFILE-TEGDEK16.TOKFLIB
+    OVRF      FILE-TEGDEK17,TOFILE-TEGDEK17.TOKFLIB
+    OVRF      FILE-TEGDEK18,TOFILE-TEGDEK18.TOKFLIB
+    OVRF      FILE-TEGDEK19,TOFILE-TEGDEK19.TOKFLIB
+    OVRF      FILE-TEGDEK20,TOFILE-TEGDEK20.TOKFLIB
+    CALL      PGM-SKE0130B.TOKELIB,PARA-(?P4,?P1,?P2,?P3)
+    IF        @PGMEC    ^=   0    THEN
+              GOTO ABEND END
+
+RTN:
+
+    ?MSGX :=  '***   '  && ?PGMID  &&   ' END    ***'
+    SNDMSG    ?MSGX,TO-XCTL
+
+    RETURN    PGMEC-@PGMEC
+
+
+ABEND:
+
+    ?PGMEC    :=    @PGMEC
+    ?PGMEM    :=    @PGMEM
+    ?PGMECX   :=    %STRING(?PGMEC)
+    ?MSG(1)   :=    '### ' && ?PGMID && ' ABEND' && ' ###'
+    ?MSG(2)   :=    '### ' && ' PGMEC = ' &&
+                     %SBSTR(?PGMECX,8,4) && ' ###'
+    ?MSG(3)   :=    '###' && ' LINE = '  && %LAST(LINE)      && ' ###'
+    FOR ?I    :=     1 TO 3
+        DO     ?MSGX :=   ?MSG(?I)
+               SNDMSG    ?MSGX,TO-XCTL
+    END
+
+    RETURN    PGMEC-@PGMEC
+
