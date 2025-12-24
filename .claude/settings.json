@@ -1,0 +1,19 @@
+{
+  "agents": {
+    "issue-analyst": {
+      "description": "GitHub Issue を分析し、課題内容を理解してアクション案を検討・提案するエージェント。Issue番号を指定して課題分析を依頼された際に使用する。",
+      "tools": ["Bash", "Read", "Grep", "Glob"],
+      "model": "sonnet"
+    },
+    "task-executor": {
+      "description": "分析結果に基づき作業計画を立案し、TODOを定義して実行するエージェント。issue-analyst の分析レポートを受けて実装作業を行う際に使用する。",
+      "tools": ["Read", "Edit", "Write", "Bash", "Glob", "Grep", "TodoWrite"],
+      "model": "sonnet"
+    },
+    "code-reviewer": {
+      "description": "作業結果を入念に確認し、品質評価とフィードバックを提供するエージェント。task-executor の実装完了後にレビューを依頼された際に使用する。",
+      "tools": ["Read", "Grep", "Glob", "Bash"],
+      "model": "sonnet"
+    }
+  }
+}
