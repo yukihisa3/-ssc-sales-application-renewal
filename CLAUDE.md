@@ -76,6 +76,14 @@ lib/
 └── claude-cli      → ../../claude-cli/lib/claude-cli
 ```
 
+| Library | Description |
+|---------|-------------|
+| `openai-cli` | OpenAI GPT CLI (Python) - Interactive mode, file I/O, session management |
+| `nanobanana-cli` | Google Gemini Pro Image Generation CLI (Python) |
+| `claude-cli` | Claude API CLI (Python) - File input, Markdown output, session management |
+
+**Purpose**: AI/LLM tools for legacy system analysis and refactoring support.
+
 ### source/ Structure (Legacy Source Data - READ ONLY)
 
 ```
