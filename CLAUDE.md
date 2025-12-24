@@ -301,6 +301,54 @@ source/navs/datas/          → [parse] → repository/json/datas/
 repository/json/            → [analyze] → analysis/legacy/
 ```
 
+## Custom Agents
+
+Project-specific subagents for GitHub Issue workflow:
+
+| Agent | Description | Tools |
+|-------|-------------|-------|
+| `issue-analyst` | GitHub Issue 分析、アクション提案 | Bash, Read, Grep, Glob |
+| `task-executor` | 作業計画立案、TODO定義、実装実行 | Read, Edit, Write, Bash, Glob, Grep, TodoWrite |
+| `code-reviewer` | 品質評価、フィードバック提供 | Read, Grep, Glob, Bash |
+
+### Workflow
+
+```
+GitHub Issue
+    ↓
+[issue-analyst] → work-records/{user}/issue-{num}-analysis.md
+    ↓
+[task-executor] → 実装 + work-records/{user}/issue-{num}-execution.md
+    ↓
+[code-reviewer] → work-records/{user}/issue-{num}-review.md
+```
+
+### Usage
+
+```
+# Issue 分析
+Issue #123 を分析して
+
+# 分析→実行
+Issue #123 を分析して実装して
+
+# フルワークフロー
+Issue #123 を分析→実装→レビューして
+```
+
+### Configuration
+
+```
+.claude/
+├── agents/
+│   ├── issue-analyst.md
+│   ├── task-executor.md
+│   └── code-reviewer.md
+└── skills/
+    └── github-issue/
+        └── SKILL.md
+```
+
 ## Commands
 
 *To be added after project setup*
