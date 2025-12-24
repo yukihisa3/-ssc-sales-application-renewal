@@ -44,6 +44,36 @@
 - システムの `/tmp` は使用禁止、作業ファイルは `work/` を使用
 - 契約関連資料は Git 管理対象外
 
+## Claude Code エージェント
+
+GitHub Issue を起点とした開発ワークフローを支援するカスタムエージェント。
+
+| エージェント | 役割 |
+|-------------|------|
+| `issue-analyst` | Issue分析、アクション提案 |
+| `task-executor` | 作業計画立案、TODO定義、実装実行 |
+| `code-reviewer` | 品質評価、フィードバック提供 |
+
+### ワークフロー
+
+```
+GitHub Issue
+    ↓
+[issue-analyst] → 分析レポート
+    ↓
+[task-executor] → 実装
+    ↓
+[code-reviewer] → 評価レポート
+```
+
+### 設定ファイル
+
+```
+.claude/
+├── agents/           # エージェント定義
+└── skills/           # スキル定義
+```
+
 ## 技術スタック
 
 - **Frontend**: React, TypeScript
@@ -51,3 +81,4 @@
 - **Database**: PostgreSQL
 - **Infrastructure**: AWS (Terraform)
 - **Legacy Analysis**: SQLite, React
+- **AI/LLM**: Claude Code (カスタムエージェント)
